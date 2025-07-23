@@ -29,7 +29,7 @@ from previous_contact_manager import (
     handle_previous_contact_after_reassignment
 )
 
-```python
+python
 # Authentication function
 def check_password():
     """Returns `True` if the user had the correct password."""
@@ -64,7 +64,7 @@ def check_password():
         return False
     else:
         return True
-```
+
 
 # Configure Streamlit page
 st.set_page_config(
