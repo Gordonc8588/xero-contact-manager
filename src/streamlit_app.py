@@ -29,6 +29,43 @@ from previous_contact_manager import (
     handle_previous_contact_after_reassignment
 )
 
+```python
+# Authentication function
+def check_password():
+    """Returns `True` if the user had the correct password."""
+    
+    def password_entered():
+        """Checks whether a password entered by the user is correct."""
+        if st.session_state["password"] == st.secrets["APP_PASSWORD"]:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        st.title("🔒 Xero Property Manager - Login")
+        st.text_input(
+            "Enter Password", 
+            type="password", 
+            on_change=password_entered, 
+            key="password"
+        )
+        st.info("Please contact your administrator for access.")
+        return False
+    elif not st.session_state["password_correct"]:
+        st.title("🔒 Xero Property Manager - Login")
+        st.text_input(
+            "Enter Password", 
+            type="password", 
+            on_change=password_entered, 
+            key="password"
+        )
+        st.error("😕 Password incorrect")
+        return False
+    else:
+        return True
+```
+
 # Configure Streamlit page
 st.set_page_config(
     page_title="Xero Contact Manager",
@@ -1134,4 +1171,5 @@ def main():
         st.write("• ✅ Close the application")
 
 if __name__ == "__main__":
-    main()
+    if check_password():
+        main()
