@@ -32,10 +32,10 @@ from previous_contact_manager import (
 
 # Authentication function
 def check_password():
-    if "authenticated" not in st.session_state:
-        st.session_state.authenticated = False
+    if "password_authenticated" not in st.session_state:
+        st.session_state.password_authenticated = False
     
-    if not st.session_state.authenticated:
+    if not st.session_state.password_authenticated:
         st.title("🔒 Xero Property Manager")
         st.subheader("Please enter password to continue")
         
@@ -43,7 +43,7 @@ def check_password():
         
         if st.button("Login"):
             if password == st.secrets["APP_PASSWORD"]:
-                st.session_state.authenticated = True
+                st.session_state.password_authenticated = True
                 st.success("✅ Login successful!")
                 st.rerun()
             else:
@@ -66,12 +66,14 @@ st.set_page_config(
 # Initialize session state variables
 if 'contact_manager' not in st.session_state:
     st.session_state.contact_manager = None
+if 'password_authenticated' not in st.session_state:
+    st.session_state.password_authenticated = False
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
 if 'existing_contact' not in st.session_state:
     st.session_state.existing_contact = None
 if 'search_performed' not in st.session_state:
     st.session_state.search_performed = False
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
 if 'new_contact' not in st.session_state:
     st.session_state.new_contact = None
 if 'found_invoices' not in st.session_state:
