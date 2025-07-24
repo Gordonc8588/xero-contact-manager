@@ -161,48 +161,9 @@ def create_new_contact(contact_data: Dict[str, str]):
         return None
 
 def display_contact_details(contact: Dict[str, Any], title: str):
-    """Display contact details in a formatted way."""
-    st.subheader(title)
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.write("**Basic Information:**")
-        st.write(f"• **Name:** {contact.get('Name', 'N/A')}")
-        st.write(f"• **Account Number:** {contact.get('AccountNumber', 'N/A')}")
-        st.write(f"• **Status:** {contact.get('ContactStatus', 'N/A')}")
-        if contact.get('ContactID'):
-            st.write(f"• **Contact ID:** {contact.get('ContactID')}")
-    
-    with col2:
-        # Display addresses
-        if contact.get('Addresses'):
-            st.write("**Addresses:**")
-            for i, addr in enumerate(contact['Addresses']):
-                st.write(f"**{addr.get('AddressType', 'Unknown')} Address:**")
-                address_lines = []
-                if addr.get('AddressLine1'):
-                    address_lines.append(addr['AddressLine1'])
-                if addr.get('AddressLine2'):
-                    address_lines.append(addr['AddressLine2'])
-                if addr.get('City'):
-                    city_line = addr['City']
-                    if addr.get('PostalCode'):
-                        city_line += f" {addr['PostalCode']}"
-                    if addr.get('Country'):
-                        city_line += f", {addr['Country']}"
-                    address_lines.append(city_line)
-                
-                for line in address_lines:
-                    st.write(f"  {line}")
-        
-        # Display phones
-        if contact.get('Phones'):
-            st.write("**Phone Numbers:**")
-            for phone in contact['Phones']:
-                phone_type = phone.get('PhoneType', 'Unknown')
-                phone_number = phone.get('PhoneNumber', 'N/A')
-                st.write(f"• {phone_type}: {phone_number}")
+    """Display contact details in a minimal way."""
+    contact_name = contact.get('Name', 'Unknown Contact')
+    st.success(f"**Contact found:** {contact_name}")
 
 def search_invoices_for_old_contact(contact_id: str, move_in_date: date):
     """Search for invoices assigned to old contact after move-in date."""
