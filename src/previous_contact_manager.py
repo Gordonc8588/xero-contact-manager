@@ -11,7 +11,7 @@ FUNCTIONALITY:
 - Handle zero balance contacts (set INACTIVE + /P)
 - Handle outstanding balance contacts (keep ACTIVE + /P)
 - Remove from current contact groups
-- Add to "Previous accounts still due" group
+- Add to "+ Previous accounts still due" group
 """
 
 import os
@@ -295,7 +295,7 @@ class XeroPreviousContactManager:
     
     def find_previous_accounts_group(self) -> Optional[Dict[str, Any]]:
         """
-        Find the "Previous accounts still due" contact group.
+        Find the "+ Previous accounts still due" contact group.
         
         Returns:
             dict: Contact group data if found, None otherwise
@@ -310,7 +310,7 @@ class XeroPreviousContactManager:
             if self.tenant_id and self.tenant_id != "custom_connection":
                 headers['Xero-Tenant-Id'] = self.tenant_id
             
-            print("Searching for 'Previous accounts still due' contact group...")
+            print("Searching for '+ Previous accounts still due' contact group...")
             
             response = requests.get(
                 f'{self.base_url}/ContactGroups',
@@ -324,11 +324,11 @@ class XeroPreviousContactManager:
                 # Find the exact group name
                 for group in contact_groups:
                     group_name = group.get('Name', '')
-                    if group_name == "Previous accounts still due":
-                        print(f"✅ Found 'Previous accounts still due' group: {group.get('ContactGroupID')}")
+                    if group_name == "+ Previous accounts still due":
+                        print(f"✅ Found '+ Previous accounts still due' group: {group.get('ContactGroupID')}")
                         return group
                 
-                print("❌ 'Previous accounts still due' group not found")
+                print("❌ '+ Previous accounts still due' group not found")
                 return None
             else:
                 print(f"❌ Error searching contact groups: {response.status_code} - {response.text}")
@@ -367,7 +367,7 @@ class XeroPreviousContactManager:
                 ]
             }
             
-            print(f"Adding contact {contact_id} to 'Previous accounts still due' group {group_id}")
+            print(f"Adding contact {contact_id} to '+ Previous accounts still due' group {group_id}")
             
             response = requests.put(
                 f'{self.base_url}/ContactGroups/{group_id}/Contacts',
@@ -376,7 +376,7 @@ class XeroPreviousContactManager:
             )
             
             if response.status_code == 200:
-                print("✅ Successfully added contact to 'Previous accounts still due' group")
+                print("✅ Successfully added contact to '+ Previous accounts still due' group")
                 return True
             else:
                 print(f"❌ Error adding contact to group: {response.status_code} - {response.text}")
@@ -516,24 +516,24 @@ class XeroPreviousContactManager:
             
             result['groups_removed'] = removed_groups
             
-            # Step 4: Find "Previous accounts still due" group
-            print("🔍 Step 4: Finding 'Previous accounts still due' group...")
+            # Step 4: Find "+ Previous accounts still due" group
+            print("🔍 Step 4: Finding '+ Previous accounts still due' group...")
             previous_group = self.find_previous_accounts_group()
             
             if not previous_group:
-                result['error'] = "'Previous accounts still due' group not found"
+                result['error'] = "'+ Previous accounts still due' group not found"
                 print("❌ Cannot continue without target group")
                 return result
             
-            # Step 5: Add to "Previous accounts still due" group
-            print("➕ Step 5: Adding to 'Previous accounts still due' group...")
+            # Step 5: Add to "+ Previous accounts still due" group
+            print("➕ Step 5: Adding to '+ Previous accounts still due' group...")
             group_id = previous_group.get('ContactGroupID')
             
             if self.add_contact_to_group(old_contact_id, group_id):
                 result['added_to_previous_group'] = True
-                print("   ✅ Successfully added to 'Previous accounts still due' group")
+                print("   ✅ Successfully added to '+ Previous accounts still due' group")
             else:
-                print("   ❌ Failed to add to 'Previous accounts still due' group")
+                print("   ❌ Failed to add to '+ Previous accounts still due' group")
             
             # Step 6: Update contact to /P status
             print("🏷️ Step 6: Updating contact to /P status...")
@@ -555,7 +555,7 @@ class XeroPreviousContactManager:
                 print(f"   💰 Outstanding Balance: ${outstanding:.2f}")
                 print(f"   🏷️ Status: {'ACTIVE' if has_balance else 'INACTIVE'} + /P")
                 print(f"   👥 Removed from {len(removed_groups)} groups: {', '.join(removed_groups)}")
-                print(f"   ➕ Added to: Previous accounts still due")
+                print(f"   ➕ Added to: + Previous accounts still due")
             else:
                 result['error'] = "Some operations failed - check logs for details"
                 print(f"\n⚠️ Previous contact workflow completed with some failures")
