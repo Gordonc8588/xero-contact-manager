@@ -436,9 +436,13 @@ class XeroPreviousContactManager:
             
             # Prepare update payload
             payload = {
-                'ContactID': contact_id,
-                'AccountNumber': new_account_number,
-                'ContactStatus': new_status
+                'Contacts': [
+                    {
+                        'ContactID': contact_id,
+                        'AccountNumber': new_account_number,
+                        'ContactStatus': new_status
+                    }
+                ]
             }
             
             response = requests.post(
