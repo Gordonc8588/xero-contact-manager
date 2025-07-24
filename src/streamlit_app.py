@@ -425,7 +425,7 @@ def main():
                 col1, col2, col3, col4 = st.columns([1, 2, 2, 1])
                 
                 with col1:
-                    is_selected = st.checkbox("", key=f"inv_{i}", value=invoice_id in st.session_state.selected_invoices)
+                    is_selected = st.checkbox("Select", key=f"inv_{i}", value=invoice_id in st.session_state.selected_invoices, label_visibility="collapsed")
                     if is_selected:
                         selected_for_reassignment.append(invoice_id)
                 
@@ -506,6 +506,8 @@ def main():
                         if balance_info:
                             st.session_state.previous_contact_balance = balance_info
                             st.rerun()
+                        else:
+                            st.error("❌ Failed to get balance information")
         
         # Handle previous contact
         if st.session_state.previous_contact_balance:
@@ -524,15 +526,40 @@ def main():
                     old_contact_id = st.session_state.existing_contact.get('ContactID')
                     result = handle_previous_contact_workflow(old_contact_id)
                     if result.get('success'):
-                        st.success("✅ Previous contact handled")
+                        # Show detailed confirmation
+                        groups_removed = result.get('groups_removed', [])
+                        added_to_previous = result.get('added_to_previous_group', False)
+                        contact_updated = result.get('contact_updated', False)
+                        
+                        if contact_updated and added_to_previous:
+                            st.success("✅ Previous contact handled: /P code set, moved to '+ Previous accounts still due'")
+                        elif contact_updated:
+                            st.warning("⚠️ Contact updated to /P but group assignment may have failed")
+                        else:
+                            st.error("❌ Failed to update previous contact")
+                        
                         st.session_state.previous_contact_processed = True
+                        st.rerun()  # Force refresh to show summary
+                    else:
+                        error_msg = result.get('error', 'Unknown error')
+                        st.error(f"❌ Failed: {error_msg}")
     
-    # Completion message with comprehensive summary
-    if st.session_state.previous_contact_processed:
-        st.markdown("---")
-        st.success("🎉 **Workflow Complete!** All steps finished successfully.")
+    # Show completion message even if previous contact processing is skipped
+    elif st.session_state.new_contact and st.session_state.existing_contact and st.session_state.previous_contact_processed:
+        # This section will show the summary
+    
+    # Show workflow summary when new contact is created (regardless of previous contact processing)
+    if st.session_state.new_contact and st.session_state.existing_contact:
+        # Only show completion message if previous contact was actually processed
+        if st.session_state.previous_contact_processed:
+            st.markdown("---")
+            st.success("🎉 **Workflow Complete!** All steps finished successfully.")
+        else:
+            # Show what's been completed so far
+            st.markdown("---")
+            st.info("📋 **Workflow In Progress** - Complete the previous contact step above to finish.")
         
-        # Comprehensive Summary
+        # Always show comprehensive summary of what's been done
         st.markdown("### 📋 **Workflow Summary**")
         
         # 1. Contact Creation Summary
@@ -552,25 +579,31 @@ def main():
             total_found = len(st.session_state.found_invoices)
             st.write(f"• ✅ **Found {total_found} invoices** for potential reassignment")
             
-            # Count how many were actually reassigned (approximate based on selections)
-            reassigned_count = len([inv for inv in st.session_state.found_invoices 
-                                  if inv.get('InvoiceID') not in st.session_state.selected_invoices])
-            if reassigned_count > 0 or len(st.session_state.selected_invoices) == 0:
-                st.write(f"• ✅ **Reassigned invoices** from old to new contact")
+            # Check if any invoices were actually reassigned
+            if len(st.session_state.selected_invoices) == 0:
+                # Invoices were likely reassigned (selected_invoices gets cleared after reassignment)
+                st.write(f"• ✅ **Successfully reassigned invoices** from old to new contact")
             else:
-                st.write(f"• ℹ️ **No invoices selected** for reassignment")
+                st.write(f"• ℹ️ **{len(st.session_state.selected_invoices)} invoices still selected** (not yet reassigned)")
         else:
             st.write("• ℹ️ **No invoices found** for reassignment")
         
         # 3. Template Reassignment Summary
         st.markdown("**3️⃣ Repeating Invoice Template:**")
-        if st.session_state.found_repeating_templates:
-            template = st.session_state.found_repeating_templates[0]
-            template_ref = template.get('Reference', 'N/A')
-            st.write(f"• ✅ **Found template:** {template_ref}")
-            st.write(f"• ✅ **Reassigned template** from old to new contact")
+        if st.session_state.template_search_performed:
+            if st.session_state.found_repeating_templates:
+                # Check if templates list is empty (would mean it was reassigned and cleared)
+                if len(st.session_state.found_repeating_templates) == 0:
+                    st.write(f"• ✅ **Template found and reassigned** from old to new contact")
+                else:
+                    template = st.session_state.found_repeating_templates[0]
+                    template_ref = template.get('Reference', 'N/A')
+                    st.write(f"• ✅ **Found template:** {template_ref}")
+                    st.write(f"• ⚠️ **Template may not have been reassigned yet**")
+            else:
+                st.write("• ℹ️ **No repeating invoice template** found")
         else:
-            st.write("• ℹ️ **No repeating invoice template** found")
+            st.write("• ⚠️ **Template search not performed**")
         
         # 4. Previous Contact Handling Summary
         st.markdown("**4️⃣ Previous Contact Management:**")
@@ -591,13 +624,17 @@ def main():
             st.write(f"• ✅ **Previous contact processed:** {old_name}")
         
         # 5. Final Status
-        st.markdown("**✅ All modules completed successfully!**")
+        if st.session_state.previous_contact_processed:
+            st.markdown("**✅ All modules completed successfully!**")
+        else:
+            st.markdown("**⚠️ Previous contact step still pending** - Complete Section 5 above to finish")
         
         # Add restart option
         st.markdown("---")
         col1, col2, col3 = st.columns([1, 1, 1])
         with col2:
-            if st.button("🆕 Start New Workflow", type="primary", use_container_width=True):
+            button_text = "🆕 Start New Workflow" if st.session_state.previous_contact_processed else "🔄 Reset Current Workflow"
+            if st.button(button_text, type="primary", use_container_width=True):
                 keys_to_clear = ['existing_contact', 'search_performed', 'new_contact', 'found_invoices', 
                                'selected_invoices', 'found_repeating_templates', 'previous_contact_balance', 'previous_contact_processed']
                 for key in keys_to_clear:
