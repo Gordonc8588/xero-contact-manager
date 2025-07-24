@@ -544,11 +544,7 @@ def main():
                         error_msg = result.get('error', 'Unknown error')
                         st.error(f"❌ Failed: {error_msg}")
     
-    # Show completion message even if previous contact processing is skipped
-    elif st.session_state.new_contact and st.session_state.existing_contact and st.session_state.previous_contact_processed:
-        # This section will show the summary
-    
-    # Show workflow summary when new contact is created (regardless of previous contact processing)
+    # Show workflow summary when new contact is created
     if st.session_state.new_contact and st.session_state.existing_contact:
         # Only show completion message if previous contact was actually processed
         if st.session_state.previous_contact_processed:
