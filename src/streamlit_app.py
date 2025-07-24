@@ -1,5 +1,5 @@
 """
-Xero Contact Manager - Streamlit Interface
+Xero Contact Manager - Streamlit Interface (Minimalist Version)
 ==========================================
 
 This module provides a Streamlit web interface for creating new property contacts
@@ -37,8 +37,6 @@ def check_password():
     
     if not st.session_state.password_authenticated:
         st.title("🔒 Xero Property Manager")
-        st.subheader("Please enter password to continue")
-        
         password = st.text_input("Password", type="password")
         
         if st.button("Login"):
@@ -54,13 +52,12 @@ def check_password():
     return True
 
 
-
 # Configure Streamlit page
 st.set_page_config(
     page_title="Xero Contact Manager",
     page_icon="🏢",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # Initialize session state variables
@@ -306,286 +303,82 @@ def handle_previous_contact_workflow(old_contact_id: str):
 
 # Main Streamlit App
 def main():
-    st.title("🏢 Xero Property Contact Creator")
-    st.markdown("---")
+    # Minimalist header
+    st.title("🏢 Xero Property Contact Manager")
     
-    # Sidebar for navigation and info
-    with st.sidebar:
-        st.header("Multi-Module System")
-        
-        st.markdown("### Module 1: Contact Creation")
-        st.info("Create new tenant/owner contacts by duplicating existing property contacts with modifications.")
-        
-        st.markdown("### Module 2: Invoice Reassignment")
-        st.info("Reassign invoices from old contacts to new contacts based on move-in date.")
-        
-        st.markdown("### Module 3: Previous Contact Management")
-        st.info("Handle previous contact status based on outstanding balance.")
-        
-        if st.button("Clear All Data", type="secondary"):
-            # Reset all session state
-            keys_to_clear = [
-                'existing_contact', 'search_performed', 'contact_manager', 
-                'authenticated', 'new_contact', 'found_invoices', 
-                'selected_invoices', 'invoice_search_performed',
-                'found_repeating_templates', 'template_search_performed',
-                'previous_contact_balance', 'previous_contact_processed'
-            ]
+    # Status indicator
+    col1, col2, col3 = st.columns([2, 1, 1])
+    with col1:
+        pass
+    with col2:
+        if st.session_state.authenticated:
+            st.success("🟢 Connected")
+        else:
+            st.warning("🟡 Not connected")
+    with col3:
+        if st.button("🔄 Reset", type="secondary"):
+            keys_to_clear = ['existing_contact', 'search_performed', 'new_contact', 'found_invoices', 
+                           'selected_invoices', 'found_repeating_templates', 'previous_contact_balance', 'previous_contact_processed']
             for key in keys_to_clear:
                 if key in st.session_state:
                     del st.session_state[key]
             st.rerun()
-        
-        # Display connection status
-        st.markdown("### Connection Status")
-        if st.session_state.authenticated:
-            st.success("🟢 Connected to Xero")
-        else:
-            st.warning("🟡 Not connected")
-        
-        # Show progress through modules
-        st.markdown("### Workflow Progress")
-        if st.session_state.existing_contact:
-            st.success("✅ Found existing contact")
-        else:
-            st.info("1️⃣ Search for existing contact")
-            
-        if st.session_state.new_contact:
-            st.success("✅ Created new contact")
-        else:
-            st.info("2️⃣ Create new contact")
-            
-        if st.session_state.new_contact:
-            st.info("3️⃣ Ready for invoice reassignment")
-        
-        if st.session_state.previous_contact_processed:
-            st.success("✅ Previous contact handled")
-        elif st.session_state.new_contact:
-            st.info("4️⃣ Ready for previous contact handling")
-        
-        # Add debug section
-        st.markdown("---")
-        st.markdown("### 🐛 Debug Mode")
-        debug_mode = st.checkbox("Enable Invoice Search Testing", help="Test invoice search without creating contacts")
-        
-        if debug_mode:
-            st.markdown("**Quick Invoice Search Test:**")
-            
-            # Option 1: Use Contact ID directly
-            with st.expander("Option 1: Direct Contact ID Search", expanded=False):
-                col1, col2 = st.columns(2)
-                with col1:
-                    test_contact_id = st.text_input(
-                        "Contact ID (UUID format)", 
-                        placeholder="e.g., 025867f1-d741-4d6b-b1af-9ac774b59ba7",
-                        help="Get this from an existing contact in Xero",
-                        key="direct_contact_id"
-                    )
-                
-                with col2:
-                    test_date = st.date_input(
-                        "Move-in Date", 
-                        value=date.today(),
-                        help="Search for invoices after this date",
-                        key="direct_test_date"
-                    )
-                
-                if st.button("🔍 Test Invoice Search", type="secondary", key="direct_test"):
-                    if test_contact_id:
-                        # Authenticate if needed
-                        if not st.session_state.authenticated:
-                            authenticate_xero()
-                        
-                        if st.session_state.authenticated:
-                            invoices = search_invoices_for_old_contact(test_contact_id, test_date)
-                            if invoices:
-                                st.success(f"✅ Found {len(invoices)} invoices!")
-                                # Show basic invoice info
-                                for inv in invoices:
-                                    st.write(f"• {inv.get('InvoiceNumber', 'N/A')} - {inv.get('Status', 'N/A')} - ${inv.get('Total', 0)}")
-                            else:
-                                st.warning("No invoices found - check terminal for debug output")
-                    else:
-                        st.error("Please enter a Contact ID")
-            
-            # Option 2: Search by Account Number first to get Contact ID
-            with st.expander("Option 2: Find Contact ID from Account Number", expanded=True):
-                col1, col2 = st.columns(2)
-                with col1:
-                    account_search = st.text_input(
-                        "Account Number", 
-                        placeholder="e.g., ANP001011 or ANP001011/3B",
-                        help="Enter account number to find Contact ID",
-                        key="account_search"
-                    )
-                
-                with col2:
-                    test_date2 = st.date_input(
-                        "Move-in Date", 
-                        value=date.today(),
-                        help="Search for invoices after this date",
-                        key="account_test_date"
-                    )
-                
-                if st.button("1. Find Contact ID", type="secondary", key="find_contact"):
-                    if account_search:
-                        # Authenticate if needed
-                        if not st.session_state.authenticated:
-                            authenticate_xero()
-                        
-                        if st.session_state.authenticated:
-                            contact = search_contact(account_search.strip().upper())
-                            if contact:
-                                contact_id = contact.get('ContactID')
-                                contact_name = contact.get('Name', 'Unknown')
-                                
-                                st.success(f"✅ Found Contact!")
-                                st.info(f"**Name:** {contact_name}\n\n**Contact ID:** `{contact_id}`")
-                                
-                                # Auto-populate for next step
-                                st.session_state.debug_found_contact_id = contact_id
-                                st.session_state.debug_contact_name = contact_name
-                            else:
-                                st.error("❌ Contact not found")
-                    else:
-                        st.error("Please enter an Account Number")
-                
-                # Step 2: Search invoices if we have a contact
-                if hasattr(st.session_state, 'debug_found_contact_id'):
-                    st.markdown(f"**Found Contact:** {st.session_state.debug_contact_name}")
-                    st.code(f"Contact ID: {st.session_state.debug_found_contact_id}")
-                    
-                    if st.button("2. 🔍 Search Invoices for This Contact", type="primary", key="search_with_found"):
-                        invoices = search_invoices_for_old_contact(st.session_state.debug_found_contact_id, test_date2)
-                        if invoices:
-                            st.success(f"✅ Found {len(invoices)} invoices!")
-                            # Show basic invoice info
-                            for inv in invoices:
-                                st.write(f"• {inv.get('InvoiceNumber', 'N/A')} - {inv.get('Status', 'N/A')} - ${inv.get('Total', 0)}")
-                        else:
-                            st.warning("No invoices found - check terminal for debug output")
-    
-    # Main content area
+
+    st.markdown("---")
     
     # ============================================================================
-    # SECTION 1: Search Existing Contact
+    # SECTION 1: Search Existing Contact (Always visible, compact)
     # ============================================================================
     
-    with st.expander("1️⃣ Find Existing Contact", expanded=True):
-        st.markdown("Enter an account number to search for an existing contact:")
-        
-        col1, col2 = st.columns([3, 1])
-        
-        with col1:
-            account_number = st.text_input(
-                "Account Number",
-                placeholder="e.g., ANP001042 or ANP001042/3B",
-                help="Enter full account number or first 8 characters for property search"
-            )
-        
-        with col2:
-            search_clicked = st.button("🔍 Search Contact", type="primary")
-        
-        # Handle search
-        if search_clicked and account_number:
-            # Validate input
-            account_number = account_number.strip().upper()
-            
-            if len(account_number) != 8 and not validate_account_number(account_number):
-                st.error("❌ Invalid account number format")
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        account_number = st.text_input("Account Number", placeholder="e.g., ANP001042 or ANP001042/3B")
+    with col2:
+        search_clicked = st.button("🔍 Search", type="primary")
+    
+    # Handle search
+    if search_clicked and account_number:
+        account_number = account_number.strip().upper()
+        if len(account_number) != 8 and not validate_account_number(account_number):
+            st.error("❌ Invalid account number format")
+        else:
+            contact = search_contact(account_number)
+            if contact:
+                display_contact_details(contact, "Found Contact Details")
             else:
-                contact = search_contact(account_number)
-                
-                if contact:
-                    st.success("✅ Contact found successfully!")
-                    display_contact_details(contact, "Found Contact Details")
-                else:
-                    st.error("❌ No contact found with that account number")
-        
-        elif search_clicked and not account_number:
-            st.error("❌ Please enter an account number")
+                st.error("❌ No contact found")
+    elif search_clicked and not account_number:
+        st.error("❌ Please enter an account number")
     
     # ============================================================================
     # SECTION 2: New Contact Details (only show if contact found)
     # ============================================================================
     
     if st.session_state.existing_contact:
-        with st.expander("2️⃣ New Contact Details", expanded=True):
-            st.markdown("Enter details for the new contact:")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                # Contact Code selection
-                st.markdown("**Contact Code:** *")
-                contact_codes = list(CONTACT_CODES.keys())
-                contact_codes.sort()
-                
-                selected_code = st.selectbox(
-                    "Select contact code",
-                    options=contact_codes,
-                    index=None,
-                    placeholder="Choose a contact code..."
-                )
-                
-                if selected_code:
-                    st.info(f"📋 {CONTACT_CODES[selected_code]}")
-                
-                # First Name (required)
-                st.markdown("**First Name:** *")
-                first_name = st.text_input(
-                    "First Name",
-                    value="Occupier",
-                    placeholder="Enter first name"
-                )
-            
-            with col2:
-                # Last Name (optional)
-                st.markdown("**Last Name:**")
-                last_name = st.text_input(
-                    "Last Name",
-                    placeholder="Enter last name (optional)"
-                )
-                
-                # Email (optional)
-                st.markdown("**Email Address:**")
-                email = st.text_input(
-                    "Email Address",
-                    placeholder="Enter email address (optional)"
-                )
-            
-            st.caption("* Required fields")
-            
-            # ============================================================================
-            # SECTION 3: Create Contact
-            # ============================================================================
-            
-            st.markdown("---")
-            st.markdown("### 3️⃣ Create New Contact")
-            
-            # Validation
-            can_create = bool(selected_code and first_name.strip())
-            
-            if not can_create:
-                missing = []
-                if not selected_code:
-                    missing.append("Contact Code")
-                if not first_name.strip():
-                    missing.append("First Name")
-                st.warning(f"⚠️ Please provide: {', '.join(missing)}")
-            
-            col1, col2, col3 = st.columns([1, 2, 1])
-            
-            with col2:
-                create_clicked = st.button(
-                    "🆕 Create New Contact",
-                    type="primary",
-                    disabled=not can_create,
-                    use_container_width=True
-                )
-            
-            # Handle contact creation
-            if create_clicked and can_create:
+        st.markdown("---")
+        
+        # Compact form layout
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            contact_codes = list(CONTACT_CODES.keys())
+            contact_codes.sort()
+            selected_code = st.selectbox("Contact Code *", options=contact_codes, index=None, placeholder="Choose...")
+        
+        with col2:
+            first_name = st.text_input("First Name *", value="Occupier", placeholder="Enter first name")
+        
+        with col3:
+            last_name = st.text_input("Last Name", placeholder="Enter last name")
+        
+        with col4:
+            email = st.text_input("Email", placeholder="Enter email")
+        
+        # Validation and create button
+        can_create = bool(selected_code and first_name.strip())
+        
+        if can_create:
+            if st.button("🆕 Create New Contact", type="primary"):
                 new_contact_data = {
                     'contact_code': selected_code,
                     'first_name': first_name.strip(),
@@ -594,533 +387,150 @@ def main():
                 }
                 
                 new_contact = create_new_contact(new_contact_data)
-                
                 if new_contact:
-                    st.success("🎉 Contact created successfully!")
-                    
-                    # Display results
-                    st.markdown("---")
-                    display_contact_details(new_contact, "✅ New Contact Created")
-                    
-                    # Show additional info
-                    if new_contact.get('group_assignment'):
-                        st.info(f"👥 Group Assignment: {new_contact.get('group_assignment')}")
-                    
-                    # Show summary
-                    original_account = st.session_state.existing_contact.get('AccountNumber', 'N/A')
-                    new_account = new_contact.get('AccountNumber', 'N/A')
-                    
-                    st.success(f"✅ **Summary:**\n"
-                             f"• Original Account: `{original_account}`\n"
-                             f"• New Account: `{new_account}`\n"
-                             f"• Contact ID: `{new_contact.get('ContactID', 'N/A')}`")
-                else:
-                    st.error("❌ Failed to create contact. Please check the logs and try again.")
+                    st.success(f"✅ Created: {new_contact.get('Name', 'Unknown')}")
     
     # ============================================================================
-    # MODULE 2: Invoice Reassignment (only show if new contact created)
+    # SECTION 3: Invoice Reassignment (only show if new contact created)
     # ============================================================================
     
     if st.session_state.new_contact and st.session_state.existing_contact:
         st.markdown("---")
-        st.markdown("## 🧾 Module 2: Invoice Reassignment")
         
-        with st.expander("4️⃣ Reassign Invoices to New Contact", expanded=True):
-            st.markdown("Search for invoices assigned to the old contact that need to be reassigned:")
-            
-            col1, col2 = st.columns([2, 1])
-            
-            with col1:
-                st.markdown("**Move-in Date:** *")
-                move_in_date = st.date_input(
-                    "Select the date when the new occupier moved in",
-                    value=date.today(),
-                    help="Invoices issued after this date will be found for reassignment"
-                )
-            
-            with col2:
-                st.markdown("**Search Invoices:**")
-                search_invoices_clicked = st.button(
-                    "🔍 Find Invoices", 
-                    type="primary",
-                    help="Search for invoices to reassign"
-                )
-            
-            # Handle invoice search
-            if search_invoices_clicked and move_in_date:
+        # Compact invoice search
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            move_in_date = st.date_input("Move-in Date", value=date.today())
+        with col2:
+            if st.button("🔍 Find Invoices", type="primary"):
                 old_contact_id = st.session_state.existing_contact.get('ContactID')
                 if old_contact_id:
                     invoices = search_invoices_for_old_contact(old_contact_id, move_in_date)
-                    
                     if invoices:
-                        st.success(f"✅ Found {len(invoices)} invoices for potential reassignment")
+                        st.success(f"✅ Found {len(invoices)} invoices")
                     else:
-                        st.info("ℹ️ No invoices found after the move-in date")
-                else:
-                    st.error("❌ No contact ID found for old contact")
+                        st.info("No invoices found")
+        
+        # Display invoices compactly
+        if st.session_state.found_invoices:
+            selected_for_reassignment = []
             
-            # Display found invoices
-            if st.session_state.found_invoices:
-                st.markdown("---")
-                st.markdown("### 📋 Invoices Available for Reassignment")
+            # Compact invoice list
+            for i, invoice in enumerate(st.session_state.found_invoices):
+                invoice_id = invoice.get('InvoiceID', '')
+                invoice_number = invoice.get('InvoiceNumber', 'N/A')
+                total = invoice.get('Total', 0)
+                status = invoice.get('Status', 'N/A')
                 
-                # Create invoice selection interface
-                col1, col2 = st.columns([3, 1])
+                col1, col2, col3, col4 = st.columns([1, 2, 2, 1])
                 
                 with col1:
-                    st.markdown("**Select invoices to reassign:**")
+                    is_selected = st.checkbox("", key=f"inv_{i}", value=invoice_id in st.session_state.selected_invoices)
+                    if is_selected:
+                        selected_for_reassignment.append(invoice_id)
                 
                 with col2:
-                    if st.button("Select All", type="secondary"):
-                        st.session_state.selected_invoices = [
-                            inv.get('InvoiceID') for inv in st.session_state.found_invoices
-                        ]
-                        st.rerun()
+                    st.write(f"**{invoice_number}**")
                 
-                # Display invoices with checkboxes
-                selected_for_reassignment = []
+                with col3:
+                    st.write(f"${float(total):.2f}")
                 
-                for i, invoice in enumerate(st.session_state.found_invoices):
-                    invoice_id = invoice.get('InvoiceID', '')
-                    invoice_number = invoice.get('InvoiceNumber', 'N/A')
-                    invoice_date = invoice.get('DateString', 'N/A')
-                    status = invoice.get('Status', 'N/A')
-                    total = invoice.get('Total', 0)
-                    amount_due = invoice.get('AmountDue', 0)
-                    
-                    # Format date
-                    try:
-                        if invoice_date != 'N/A':
-                            date_obj = datetime.fromisoformat(invoice_date.replace('T00:00:00', ''))
-                            formatted_date = date_obj.strftime('%d %b %Y')
-                        else:
-                            formatted_date = 'N/A'
-                    except:
-                        formatted_date = invoice_date
-                    
-                    # Create checkbox for each invoice
-                    col1, col2, col3, col4, col5 = st.columns([1, 2, 2, 2, 2])
-                    
-                    with col1:
-                        is_selected = st.checkbox(
-                            f"Select",
-                            key=f"invoice_select_{i}",
-                            value=invoice_id in st.session_state.selected_invoices
-                        )
-                        
-                        if is_selected and invoice_id not in selected_for_reassignment:
-                            selected_for_reassignment.append(invoice_id)
-                    
-                    with col2:
-                        st.write(f"**{invoice_number}**")
-                    
-                    with col3:
-                        st.write(f"📅 {formatted_date}")
-                    
-                    with col4:
-                        st.write(f"💰 ${float(total):.2f}")
-                    
-                    with col5:
-                        status_color = {
-                            'DRAFT': '🟡',
-                            'SUBMITTED': '🟠', 
-                            'AUTHORISED': '🟢'
-                        }.get(status, '⚪')
-                        st.write(f"{status_color} {status}")
-                
-                # Update selected invoices in session state
-                st.session_state.selected_invoices = selected_for_reassignment
-                
-                # Show reassignment section
-                if selected_for_reassignment:
-                    st.markdown("---")
-                    st.markdown("### 🔄 Confirm Reassignment")
-                    
-                    col1, col2, col3 = st.columns([1, 2, 1])
-                    
-                    with col2:
-                        st.info(f"📊 **Ready to reassign {len(selected_for_reassignment)} invoices**\n\n"
-                               f"**From:** {st.session_state.existing_contact.get('Name', 'Unknown')}\n"
-                               f"**To:** {st.session_state.new_contact.get('Name', 'Unknown')}")
-                        
-                        reassign_clicked = st.button(
-                            f"🔄 Reassign {len(selected_for_reassignment)} Invoices",
-                            type="primary",
-                            use_container_width=True
-                        )
-                    
-                    # Handle reassignment
-                    if reassign_clicked:
-                        new_contact_id = st.session_state.new_contact.get('ContactID')
-                        if new_contact_id:
-                            successful, failed = reassign_invoices(selected_for_reassignment, new_contact_id)
-                            
-                            if successful:
-                                st.success(f"🎉 Successfully reassigned {len(successful)} invoices!")
-                                
-                                # Show summary
-                                st.markdown("### ✅ Reassignment Summary")
-                                if successful:
-                                    st.success(f"**✅ Successful ({len(successful)}):**")
-                                    for invoice_id in successful:
-                                        # Find invoice details
-                                        invoice = next((inv for inv in st.session_state.found_invoices 
-                                                      if inv.get('InvoiceID') == invoice_id), None)
-                                        if invoice:
-                                            st.write(f"• {invoice.get('InvoiceNumber', 'N/A')} - ${float(invoice.get('Total', 0)):.2f}")
-                                
-                                if failed:
-                                    st.error(f"**❌ Failed ({len(failed)}):**")
-                                    for invoice_id in failed:
-                                        invoice = next((inv for inv in st.session_state.found_invoices 
-                                                      if inv.get('InvoiceID') == invoice_id), None)
-                                        if invoice:
-                                            st.write(f"• {invoice.get('InvoiceNumber', 'N/A')}")
-                                
-                                # Clear selections after successful reassignment
-                                st.session_state.selected_invoices = []
-                                
-                            else:
-                                st.error("❌ No invoices were successfully reassigned")
-                        else:
-                            st.error("❌ No contact ID found for new contact")
-        
-        # ============================================================================
-        # SECTION 5: Repeating Invoice Template Reassignment
-        # ============================================================================
-        
+                with col4:
+                    st.write(f"{status}")
+            
+            st.session_state.selected_invoices = selected_for_reassignment
+            
+            # Reassign button
+            if selected_for_reassignment:
+                if st.button(f"🔄 Reassign {len(selected_for_reassignment)} Invoices", type="primary"):
+                    new_contact_id = st.session_state.new_contact.get('ContactID')
+                    if new_contact_id:
+                        successful, failed = reassign_invoices(selected_for_reassignment, new_contact_id)
+                        if successful:
+                            st.success(f"✅ Reassigned {len(successful)} invoices")
+                            st.session_state.selected_invoices = []
+    
+    # ============================================================================
+    # SECTION 4: Repeating Invoice Template (compact)
+    # ============================================================================
+    
+    if st.session_state.new_contact and st.session_state.existing_contact:
         st.markdown("---")
         
-        with st.expander("5️⃣ Reassign Repeating Invoice Template", expanded=True):
-            st.markdown("Transfer recurring invoice template from old contact to new contact:")
-            
-            col1, col2 = st.columns([2, 1])
-            
-            with col1:
-                st.info("ℹ️ **How this works:**\n"
-                       "• Searches for repeating invoice template assigned to old contact\n"
-                       "• Copies all details (schedule, line items, amounts)\n"
-                       "• Creates new template for new contact\n"
-                       "• Deletes old template")
-            
-            with col2:
-                search_templates_clicked = st.button(
-                    "🔍 Find Repeating Template", 
-                    type="primary",
-                    help="Search for repeating invoice template"
-                )
-            
-            # Handle template search
-            if search_templates_clicked:
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            st.write("**Repeating Invoice Template:**")
+        with col2:
+            if st.button("🔍 Find Template", type="primary"):
                 old_contact_id = st.session_state.existing_contact.get('ContactID')
                 if old_contact_id:
                     templates = search_repeating_invoices_for_old_contact(old_contact_id)
-                    
                     if templates:
-                        st.success(f"✅ Found {len(templates)} repeating invoice template(s)")
+                        st.success(f"✅ Found template")
                     else:
-                        st.info("ℹ️ No repeating invoice templates found for old contact")
-                else:
-                    st.error("❌ No contact ID found for old contact")
-            
-            # Display found templates
-            if st.session_state.found_repeating_templates:
-                st.markdown("### 📋 Found Repeating Invoice Template")
-                
-                template = st.session_state.found_repeating_templates[0]  # Only one expected
-                
-                # Format template details for display
-                schedule = template.get('Schedule', {})
-                period = schedule.get('Period', 1)
-                unit = schedule.get('Unit', 'MONTHLY').lower()
-                frequency = f"Every {period} {unit}" if period > 1 else f"{unit.capitalize()}"
-                
-                # Display template details
-                col1, col2, col3 = st.columns(3)
-                
-                with col1:
-                    st.write("**Template Details:**")
-                    st.write(f"• **Reference:** {template.get('Reference', 'N/A')}")
-                    st.write(f"• **Type:** {template.get('Type', 'N/A')}")
-                    st.write(f"• **Status:** {template.get('Status', 'N/A')}")
-                
-                with col2:
-                    st.write("**Schedule:**")
-                    st.write(f"• **Frequency:** {frequency}")
-                    st.write(f"• **Due Date:** {schedule.get('DueDate', 'N/A')} {schedule.get('DueDateType', '')}")
-                
-                with col3:
-                    st.write("**Financial:**")
-                    st.write(f"• **Total:** ${float(template.get('Total', 0)):.2f}")
-                    st.write(f"• **Line Items:** {len(template.get('LineItems', []))}")
-                
-                # Show confirmation and reassign section
-                st.markdown("---")
-                st.markdown("### 🔄 Confirm Template Reassignment")
-                
-                col1, col2, col3 = st.columns([1, 2, 1])
-                
-                with col2:
-                    st.warning(f"⚠️ **Confirm Reassignment**\n\n"
-                             f"This will:\n"
-                             f"• **Delete** the current template for: {st.session_state.existing_contact.get('Name', 'Unknown')}\n"
-                             f"• **Create** a new identical template for: {st.session_state.new_contact.get('Name', 'Unknown')}\n\n"
-                             f"**This action cannot be easily undone.**")
-                    
-                    reassign_template_clicked = st.button(
-                        "🔄 Reassign Repeating Invoice Template",
-                        type="primary",
-                        use_container_width=True
-                    )
-                
-                # Handle template reassignment
-                if reassign_template_clicked:
-                    old_contact_id = st.session_state.existing_contact.get('ContactID')
-                    new_contact_id = st.session_state.new_contact.get('ContactID')
-                    
-                    if old_contact_id and new_contact_id:
-                        result = reassign_repeating_invoice_template(old_contact_id, new_contact_id)
-                        
-                        if result.get('success'):
-                            st.success("🎉 Successfully reassigned repeating invoice template!")
-                            
-                            # Show summary
-                            st.markdown("### ✅ Reassignment Summary")
-                            
-                            old_template = result.get('found_template', {})
-                            new_template = result.get('created_template', {})
-                            
-                            col1, col2 = st.columns(2)
-                            
-                            with col1:
-                                st.success("**✅ Old Template (Deleted):**")
-                                st.write(f"• ID: {old_template.get('RepeatingInvoiceID', 'N/A')}")
-                                st.write(f"• Reference: {old_template.get('Reference', 'N/A')}")
-                            
-                            with col2:
-                                st.success("**✅ New Template (Created):**")
-                                st.write(f"• ID: {new_template.get('RepeatingInvoiceID', 'N/A')}")
-                                st.write(f"• Reference: {new_template.get('Reference', 'N/A')}")
-                            
-                            if not result.get('deleted_successfully'):
-                                st.warning("⚠️ **Note:** New template created successfully, but old template deletion may have failed. Please check manually in Xero.")
-                            
-                            # Clear the found templates since reassignment is complete
-                            st.session_state.found_repeating_templates = []
-                            
-                        else:
-                            error_msg = result.get('error', 'Unknown error occurred')
-                            st.error(f"❌ Failed to reassign template: {error_msg}")
-                    else:
-                        st.error("❌ Missing contact IDs for reassignment")
+                        st.info("No template found")
         
-        # ============================================================================
-        # MODULE 3: Previous Contact Management (only show if new contact created)
-        # ============================================================================
-        
-        if st.session_state.new_contact and st.session_state.existing_contact:
-            st.markdown("---")
-            st.markdown("## 👤 Module 3: Previous Contact Management")
+        # Handle template reassignment
+        if st.session_state.found_repeating_templates:
+            template = st.session_state.found_repeating_templates[0]
+            reference = template.get('Reference', 'N/A')
+            st.write(f"Template: {reference}")
             
-            with st.expander("6️⃣ Handle Previous Contact Status", expanded=True):
-                st.markdown("Manage the previous contact after successful reassignment:")
-                
+            if st.button("🔄 Reassign Template", type="primary"):
                 old_contact_id = st.session_state.existing_contact.get('ContactID')
+                new_contact_id = st.session_state.new_contact.get('ContactID')
+                if old_contact_id and new_contact_id:
+                    result = reassign_repeating_invoice_template(old_contact_id, new_contact_id)
+                    if result.get('success'):
+                        st.success("✅ Template reassigned")
+                        st.session_state.found_repeating_templates = []
+    
+    # ============================================================================
+    # SECTION 5: Previous Contact Management (compact)
+    # ============================================================================
+    
+    if st.session_state.new_contact and st.session_state.existing_contact and not st.session_state.previous_contact_processed:
+        st.markdown("---")
+        
+        # Balance check
+        if not st.session_state.previous_contact_balance:
+            col1, col2 = st.columns([2, 1])
+            with col1:
                 old_contact_name = st.session_state.existing_contact.get('Name', 'Unknown')
-                
-                if not st.session_state.previous_contact_processed:
-                    # Step 1: Check balance
-                    if not st.session_state.previous_contact_balance:
-                        col1, col2 = st.columns([2, 1])
-                        
-                        with col1:
-                            st.info(f"ℹ️ **Previous Contact:** {old_contact_name}\n\n"
-                                   "We need to check if this contact has any outstanding balance to determine the next action.")
-                        
-                        with col2:
-                            check_balance_clicked = st.button(
-                                "💰 Check Balance", 
-                                type="primary",
-                                help="Check outstanding balance for previous contact"
-                            )
-                        
-                        # Handle balance check
-                        if check_balance_clicked and old_contact_id:
-                            balance_info = get_previous_contact_balance_info(old_contact_id)
-                            
-                            if balance_info:
-                                st.session_state.previous_contact_balance = balance_info
-                                st.rerun()
-                            else:
-                                st.error("❌ Failed to get balance information")
-                    
-                    # Step 2: Show balance and action options
-                    if st.session_state.previous_contact_balance:
-                        balance_info = st.session_state.previous_contact_balance
-                        outstanding = balance_info['outstanding']
-                        has_balance = balance_info['has_balance']
-                        
-                        st.markdown("---")
-                        st.markdown("### 💰 Balance Status")
-                        
-                        col1, col2, col3 = st.columns([2, 1, 1])
-                        
-                        with col1:
-                            if has_balance:
-                                st.warning(f"⚠️ **Outstanding Balance: ${outstanding:.2f}**\n\n"
-                                         f"The previous contact **{old_contact_name}** still has an outstanding balance.\n\n"
-                                         "**Recommended Action:**\n"
-                                         "• Change contact code to **/P** (Previous account still owing money)\n"
-                                         "• Keep contact **ACTIVE** (they still owe money)\n"
-                                         "• Move to **'Previous accounts still due'** contact group")
-                            else:
-                                st.success(f"✅ **Zero Balance: ${outstanding:.2f}**\n\n"
-                                         f"The previous contact **{old_contact_name}** has no outstanding balance.\n\n"
-                                         "**Recommended Action:**\n"
-                                         "• Change contact code to **/P** (Previous account)\n" 
-                                         "• Set contact to **INACTIVE** (no longer active)\n"
-                                         "• Move to **'Previous accounts still due'** contact group")
-                        
-                        with col2:
-                            if has_balance:
-                                st.metric("Outstanding", f"${outstanding:.2f}", delta=None)
-                                st.metric("Status", "ACTIVE", delta="Keep Active")
-                            else:
-                                st.metric("Outstanding", f"${outstanding:.2f}", delta=None)
-                                st.metric("Status", "INACTIVE", delta="Archive")
-                        
-                        with col3:
-                            st.metric("Action", "/P Code", delta="Previous")
-                            st.metric("Group", "Previous accounts", delta="Move")
-                        
-                        # Confirmation section
-                        st.markdown("---")
-                        st.markdown("### 🔄 Confirm Action")
-                        
-                        col1, col2, col3 = st.columns([1, 2, 1])
-                        
-                        with col2:
-                            action_description = (
-                                "Set to INACTIVE + /P code" if not has_balance 
-                                else "Keep ACTIVE + /P code"
-                            )
-                            
-                            st.warning(f"⚠️ **Confirm Previous Contact Handling**\n\n"
-                                     f"This will:\n"
-                                     f"• **{action_description}**\n"
-                                     f"• **Remove** from current contact groups\n"
-                                     f"• **Add** to 'Previous accounts still due' group\n\n"
-                                     f"**This action modifies the contact in Xero.**")
-                            
-                            handle_previous_clicked = st.button(
-                                f"🔄 Handle Previous Contact",
-                                type="primary",
-                                use_container_width=True
-                            )
-                        
-                        # Handle the workflow
-                        if handle_previous_clicked:
-                            result = handle_previous_contact_workflow(old_contact_id)
-                            
-                            if result.get('success'):
-                                st.success("🎉 Successfully handled previous contact!")
-                                
-                                # Show detailed results
-                                st.markdown("### ✅ Previous Contact Summary")
-                                
-                                balance_info = result.get('balance_info', {})
-                                outstanding = balance_info.get('outstanding', 0)
-                                groups_removed = result.get('groups_removed', [])
-                                
-                                col1, col2 = st.columns(2)
-                                
-                                with col1:
-                                    st.success("**✅ Actions Completed:**")
-                                    status = "INACTIVE" if outstanding == 0 else "ACTIVE"
-                                    st.write(f"• **Status:** Set to {status}")
-                                    st.write(f"• **Code:** Changed to /P")
-                                    st.write(f"• **Balance:** ${outstanding:.2f}")
-                                
-                                with col2:
-                                    st.success("**✅ Group Changes:**")
-                                    if groups_removed:
-                                        st.write("**Removed from:**")
-                                        for group in groups_removed:
-                                            st.write(f"  • {group}")
-                                    st.write("**Added to:**")
-                                    st.write("  • Previous accounts still due")
-                                
-                                # Mark as processed
-                                st.session_state.previous_contact_processed = True
-                                
-                            else:
-                                error_msg = result.get('error', 'Unknown error occurred')
-                                st.error(f"❌ Failed to handle previous contact: {error_msg}")
-                                
-                                # Show partial results if any
-                                if result.get('balance_info'):
-                                    st.warning("⚠️ **Partial Results:**")
-                                    if result.get('contact_updated'):
-                                        st.write("✅ Contact updated to /P")
-                                    if result.get('added_to_previous_group'):
-                                        st.write("✅ Added to previous accounts group")
-                                    if result.get('groups_removed'):
-                                        st.write(f"✅ Removed from {len(result['groups_removed'])} groups")
-                
-                else:
-                    # Already processed
-                    st.success("✅ **Previous Contact Already Handled**\n\n"
-                             "The previous contact has been successfully processed and moved to appropriate status.")
-                    
-                    if st.button("🔄 Process Another Contact", type="secondary"):
-                        # Reset for new workflow
-                        keys_to_reset = [
-                            'existing_contact', 'new_contact', 'found_invoices', 
-                            'selected_invoices', 'found_repeating_templates',
-                            'previous_contact_balance', 'previous_contact_processed'
-                        ]
-                        for key in keys_to_reset:
-                            if key in st.session_state:
-                                del st.session_state[key]
-                        st.rerun()
+                st.write(f"**Previous Contact:** {old_contact_name}")
+            with col2:
+                if st.button("💰 Check Balance", type="primary"):
+                    old_contact_id = st.session_state.existing_contact.get('ContactID')
+                    if old_contact_id:
+                        balance_info = get_previous_contact_balance_info(old_contact_id)
+                        if balance_info:
+                            st.session_state.previous_contact_balance = balance_info
+                            st.rerun()
+        
+        # Handle previous contact
+        if st.session_state.previous_contact_balance:
+            balance_info = st.session_state.previous_contact_balance
+            outstanding = balance_info['outstanding']
+            has_balance = balance_info['has_balance']
+            
+            col1, col2, col3 = st.columns([2, 1, 1])
+            with col1:
+                status_text = f"Balance: ${outstanding:.2f} - {'Keep Active' if has_balance else 'Set Inactive'}"
+                st.write(status_text)
+            with col2:
+                st.write("Action: /P code")
+            with col3:
+                if st.button("🔄 Handle", type="primary"):
+                    old_contact_id = st.session_state.existing_contact.get('ContactID')
+                    result = handle_previous_contact_workflow(old_contact_id)
+                    if result.get('success'):
+                        st.success("✅ Previous contact handled")
+                        st.session_state.previous_contact_processed = True
     
-    else:
-        # Show message if no contact searched yet
-        if not st.session_state.search_performed:
-            st.info("👆 Please search for an existing contact first to continue")
-        else:
-            st.warning("❌ No contact found. Please search again with a different account number.")
-    
-    # Show instructions for next steps
+    # Completion message
     if st.session_state.previous_contact_processed:
         st.markdown("---")
-        st.success("🎉 **Complete Workflow Finished!** You have successfully:")
-        st.write("• ✅ Created new contact")
-        st.write("• ✅ Reassigned invoices (if any)")
-        st.write("• ✅ Reassigned repeating invoice templates (if any)")
-        st.write("• ✅ Handled previous contact status")
-        st.write("• ✅ Updated contact groups appropriately")
-        
-        if st.button("🆕 Start New Workflow", type="primary"):
-            # Reset everything for fresh start
-            keys_to_clear = [
-                'existing_contact', 'search_performed', 'new_contact', 'found_invoices', 
-                'selected_invoices', 'invoice_search_performed', 'found_repeating_templates',
-                'template_search_performed', 'previous_contact_balance', 'previous_contact_processed'
-            ]
-            for key in keys_to_clear:
-                if key in st.session_state:
-                    del st.session_state[key]
-            st.rerun()
-            
-    elif st.session_state.new_contact:
-        st.markdown("---")
-        st.success("🎉 **Workflow In Progress!** You can now:")
-        st.write("• ✅ Create another contact (Clear All Data)")
-        st.write("• ✅ Reassign invoices using Section 4 above")
-        st.write("• ✅ Reassign repeating invoice templates using Section 5 above")
-        st.write("• ✅ Handle previous contact using Section 6 above")
-        st.write("• ✅ Close the application")
+        st.success("🎉 **Workflow Complete!** All steps finished successfully.")
 
 if __name__ == "__main__":
     if check_password():
