@@ -434,8 +434,12 @@ class XeroPreviousContactManager:
             print(f"   New Account: {new_account_number}")
             print(f"   New Status: {new_status} ({status_reason})")
             
-            # Prepare update payload
-            payload = {
+            # Try multiple approaches for contact update
+            success = False
+            last_error = ""
+            
+            # Approach 1: Standard POST with Contacts array (current method)
+            payload1 = {
                 'Contacts': [
                     {
                         'ContactID': contact_id,
@@ -445,131 +449,197 @@ class XeroPreviousContactManager:
                 ]
             }
             
-            response = requests.post(
-                f'{self.base_url}/Contacts/{contact_id}',
+            print(f"🔄 Attempt 1: POST to /Contacts with Contacts array")
+            response1 = requests.post(
+                f'{self.base_url}/Contacts',
                 headers=headers,
-                json=payload
+                json=payload1
             )
             
-            if response.status_code == 200:
-                print(f"✅ Successfully updated contact to /P status")
+            print(f"   Response: {response1.status_code} - {response1.text[:200]}")
+            
+            # FIX: Accept both 200 and 204 as success
+            if response1.status_code in [200, 204]:
+                print(f"✅ Successfully updated contact to /P status (Approach 1)")
                 return True
             else:
-                print(f"❌ Error updating contact: {response.status_code} - {response.text}")
-                return False
-                
-        except Exception as e:
-            print(f"❌ Error updating contact to previous status: {str(e)}")
+                last_error = f"Approach 1 failed: {response1.status_code} - {response1.text}"
+                print(f"❌ Approach 1 failed: {response1.status_code}")
+            
+            # Approach 2: PUT with contact_id in URL
+            print(f"🔄 Attempt 2: PUT to /Contacts/{contact_id}")
+            response2 = requests.put(
+                f'{self.base_url}/Contacts/{contact_id}',
+                headers=headers,
+                json=payload1  # Same payload structure
+            )
+            
+            print(f"   Response: {response2.status_code} - {response2.text[:200]}")
+            
+            if response2.status_code in [200, 204]:
+                print(f"✅ Successfully updated contact to /P status (Approach 2)")
+                return True
+            else:
+                last_error = f"Approach 2 failed: {response2.status_code} - {response2.text}"
+                print(f"❌ Approach 2 failed: {response2.status_code}")
+            
+            # Approach 3: POST with direct object (no Contacts array)
+            payload3 = {
+                'ContactID': contact_id,
+                'AccountNumber': new_account_number,
+                'ContactStatus': new_status
+            }
+            
+            print(f"🔄 Attempt 3: POST to /Contacts with direct object")
+            response3 = requests.post(
+                f'{self.base_url}/Contacts',
+                headers=headers,
+                json=payload3
+            )
+            
+            print(f"   Response: {response3.status_code} - {response3.text[:200]}")
+            
+            if response3.status_code in [200, 204]:
+                print(f"✅ Successfully updated contact to /P status (Approach 3)")
+                return True
+            else:
+                last_error = f"Approach 3 failed: {response3.status_code} - {response3.text}"
+                print(f"❌ Approach 3 failed: {response3.status_code}")
+            
+            # Approach 4: POST to specific contact endpoint with contact_id
+            print(f"🔄 Attempt 4: POST to /Contacts/{contact_id} (original approach)")
+            response4 = requests.post(
+                f'{self.base_url}/Contacts/{contact_id}',
+                headers=headers,
+                json=payload1
+            )
+            
+            print(f"   Response: {response4.status_code} - {response4.text[:200]}")
+            
+            if response4.status_code in [200, 204]:
+                print(f"✅ Successfully updated contact to /P status (Approach 4)")
+                return True
+            else:
+                last_error = f"Approach 4 failed: {response4.status_code} - {response4.text}"
+                print(f"❌ All approaches failed. Last error: {last_error}")
+            
+            # If we get here, all approaches failed
+            print(f"❌ Error updating contact - all approaches failed")
+            print(f"   Last error: {last_error}")
             return False
-    
-    def handle_previous_contact_workflow(self, old_contact_id: str) -> Dict[str, Any]:
-        """
-        Main workflow function to handle previous contact after successful reassignment.
-        
-        Args:
-            old_contact_id (str): ContactID of the previous contact
-            
-        Returns:
-            dict: Result with success status and details
-        """
-        result = {
-            'success': False,
-            'balance_info': None,
-            'groups_removed': [],
-            'added_to_previous_group': False,
-            'contact_updated': False,
-            'error': None
-        }
-        
-        try:
-            print(f"\n🔄 Starting previous contact workflow for: {old_contact_id}")
-            
-            # Step 1: Get contact balance
-            print("📊 Step 1: Getting contact balance...")
-            balance_info = self.get_contact_balance(old_contact_id)
-            
-            if not balance_info:
-                result['error'] = "Failed to get contact balance"
-                return result
-            
-            result['balance_info'] = balance_info
-            outstanding = balance_info['outstanding']
-            has_balance = balance_info['has_balance']
-            contact_data = balance_info['contact_data']
-            
-            print(f"💰 Balance Status: ${outstanding:.2f} outstanding")
-            print(f"📋 Action: {'Keep ACTIVE (has balance)' if has_balance else 'Set INACTIVE (zero balance)'}")
-            
-            # Step 2: Get current contact groups
-            print("👥 Step 2: Getting current contact groups...")
-            current_groups = self.get_contact_groups_for_contact(old_contact_id)
-            
-            # Step 3: Remove from current groups
-            print(f"🗑️ Step 3: Removing from {len(current_groups)} current groups...")
-            removed_groups = []
-            
-            for group in current_groups:
-                group_id = group.get('ContactGroupID')
-                group_name = group.get('Name', 'Unknown')
-                
-                if self.remove_contact_from_group(old_contact_id, group_id):
-                    removed_groups.append(group_name)
-                    print(f"   ✅ Removed from: {group_name}")
-                else:
-                    print(f"   ❌ Failed to remove from: {group_name}")
-            
-            result['groups_removed'] = removed_groups
-            
-            # Step 4: Find "+ Previous accounts still due" group
-            print("🔍 Step 4: Finding '+ Previous accounts still due' group...")
-            previous_group = self.find_previous_accounts_group()
-            
-            if not previous_group:
-                result['error'] = "'+ Previous accounts still due' group not found"
-                print("❌ Cannot continue without target group")
-                return result
-            
-            # Step 5: Add to "+ Previous accounts still due" group
-            print("➕ Step 5: Adding to '+ Previous accounts still due' group...")
-            group_id = previous_group.get('ContactGroupID')
-            
-            if self.add_contact_to_group(old_contact_id, group_id):
-                result['added_to_previous_group'] = True
-                print("   ✅ Successfully added to '+ Previous accounts still due' group")
-            else:
-                print("   ❌ Failed to add to '+ Previous accounts still due' group")
-            
-            # Step 6: Update contact to /P status
-            print("🏷️ Step 6: Updating contact to /P status...")
-            if self.update_contact_to_previous_status(old_contact_id, contact_data, has_balance):
-                result['contact_updated'] = True
-                print("   ✅ Successfully updated contact to /P status")
-            else:
-                print("   ❌ Failed to update contact to /P status")
-            
-            # Determine overall success
-            if (result['contact_updated'] and 
-                result['added_to_previous_group'] and 
-                len(result['groups_removed']) > 0):
-                result['success'] = True
-                print(f"\n🎉 Previous contact workflow completed successfully!")
-                
-                # Summary
-                print(f"📋 Summary:")
-                print(f"   💰 Outstanding Balance: ${outstanding:.2f}")
-                print(f"   🏷️ Status: {'ACTIVE' if has_balance else 'INACTIVE'} + /P")
-                print(f"   👥 Removed from {len(removed_groups)} groups: {', '.join(removed_groups)}")
-                print(f"   ➕ Added to: + Previous accounts still due")
-            else:
-                result['error'] = "Some operations failed - check logs for details"
-                print(f"\n⚠️ Previous contact workflow completed with some failures")
-            
-            return result
             
         except Exception as e:
-            result['error'] = f"Error during previous contact workflow: {str(e)}"
-            print(f"❌ {result['error']}")
-            return result
+            print(f"❌ Exception during contact update: {str(e)}")
+            return False
+        
+        def handle_previous_contact_workflow(self, old_contact_id: str) -> Dict[str, Any]:
+            """
+            Main workflow function to handle previous contact after successful reassignment.
+            
+            Args:
+                old_contact_id (str): ContactID of the previous contact
+                
+            Returns:
+                dict: Result with success status and details
+            """
+            result = {
+                'success': False,
+                'balance_info': None,
+                'groups_removed': [],
+                'added_to_previous_group': False,
+                'contact_updated': False,
+                'error': None
+            }
+            
+            try:
+                print(f"\n🔄 Starting previous contact workflow for: {old_contact_id}")
+                
+                # Step 1: Get contact balance
+                print("📊 Step 1: Getting contact balance...")
+                balance_info = self.get_contact_balance(old_contact_id)
+                
+                if not balance_info:
+                    result['error'] = "Failed to get contact balance"
+                    return result
+                
+                result['balance_info'] = balance_info
+                outstanding = balance_info['outstanding']
+                has_balance = balance_info['has_balance']
+                contact_data = balance_info['contact_data']
+                
+                print(f"💰 Balance Status: ${outstanding:.2f} outstanding")
+                print(f"📋 Action: {'Keep ACTIVE (has balance)' if has_balance else 'Set INACTIVE (zero balance)'}")
+                
+                # Step 2: Get current contact groups
+                print("👥 Step 2: Getting current contact groups...")
+                current_groups = self.get_contact_groups_for_contact(old_contact_id)
+                
+                # Step 3: Remove from current groups
+                print(f"🗑️ Step 3: Removing from {len(current_groups)} current groups...")
+                removed_groups = []
+                
+                for group in current_groups:
+                    group_id = group.get('ContactGroupID')
+                    group_name = group.get('Name', 'Unknown')
+                    
+                    if self.remove_contact_from_group(old_contact_id, group_id):
+                        removed_groups.append(group_name)
+                        print(f"   ✅ Removed from: {group_name}")
+                    else:
+                        print(f"   ❌ Failed to remove from: {group_name}")
+                
+                result['groups_removed'] = removed_groups
+                
+                # Step 4: Find "+ Previous accounts still due" group
+                print("🔍 Step 4: Finding '+ Previous accounts still due' group...")
+                previous_group = self.find_previous_accounts_group()
+                
+                if not previous_group:
+                    result['error'] = "'+ Previous accounts still due' group not found"
+                    print("❌ Cannot continue without target group")
+                    return result
+                
+                # Step 5: Add to "+ Previous accounts still due" group
+                print("➕ Step 5: Adding to '+ Previous accounts still due' group...")
+                group_id = previous_group.get('ContactGroupID')
+                
+                if self.add_contact_to_group(old_contact_id, group_id):
+                    result['added_to_previous_group'] = True
+                    print("   ✅ Successfully added to '+ Previous accounts still due' group")
+                else:
+                    print("   ❌ Failed to add to '+ Previous accounts still due' group")
+                
+                # Step 6: Update contact to /P status
+                print("🏷️ Step 6: Updating contact to /P status...")
+                if self.update_contact_to_previous_status(old_contact_id, contact_data, has_balance):
+                    result['contact_updated'] = True
+                    print("   ✅ Successfully updated contact to /P status")
+                else:
+                    print("   ❌ Failed to update contact to /P status")
+                
+                # Determine overall success
+                if (result['contact_updated'] and 
+                    result['added_to_previous_group'] and 
+                    len(result['groups_removed']) > 0):
+                    result['success'] = True
+                    print(f"\n🎉 Previous contact workflow completed successfully!")
+                    
+                    # Summary
+                    print(f"📋 Summary:")
+                    print(f"   💰 Outstanding Balance: ${outstanding:.2f}")
+                    print(f"   🏷️ Status: {'ACTIVE' if has_balance else 'INACTIVE'} + /P")
+                    print(f"   👥 Removed from {len(removed_groups)} groups: {', '.join(removed_groups)}")
+                    print(f"   ➕ Added to: + Previous accounts still due")
+                else:
+                    result['error'] = "Some operations failed - check logs for details"
+                    print(f"\n⚠️ Previous contact workflow completed with some failures")
+                
+                return result
+                
+            except Exception as e:
+                result['error'] = f"Error during previous contact workflow: {str(e)}"
+                print(f"❌ {result['error']}")
+                return result
 
 
 # Standalone functions for integration with existing workflow
