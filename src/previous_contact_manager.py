@@ -375,8 +375,8 @@ class XeroPreviousContactManager:
                 json=payload
             )
             
-            if response.status_code == 200:
-                print("✅ Successfully added contact to '+ Previous accounts still due' group")
+            if response.status_code in [200, 204]:
+                print(f"✅ Successfully updated contact to /P status")
                 return True
             else:
                 print(f"❌ Error adding contact to group: {response.status_code} - {response.text}")
