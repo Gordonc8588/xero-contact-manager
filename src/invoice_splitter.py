@@ -1,5 +1,5 @@
 # “””
-Xero Invoice Splitter - Module 4
+Xero Invoice Splitter - Module 4 (UPDATED)
 
 This module handles invoice splitting functionality for the property management system.
 When occupiers change mid-billing period, invoices need to be split between:
@@ -16,7 +16,9 @@ FUNCTIONALITY:
 - Modify existing invoice for previous occupier
 - Create new invoice for new occupier
 - Round amounts up to nearest 10p (£0.10)
-  “””
+
+UPDATED: Now uses billing schedules from constants.py instead of hardcoded values.
+“””
 
 import os
 import json
@@ -28,9 +30,18 @@ from calendar import monthrange
 from dotenv import load_dotenv
 import requests
 
-# Import our business rules
+# Import our business rules (UPDATED: Now using billing schedule functions)
 
-from constants import parse_account_number, CONTACT_CODES
+from constants import (
+parse_account_number,
+CONTACT_CODES,
+get_billing_schedule,
+get_billing_frequency,
+get_billing_period_days,
+get_billing_start_day,
+can_split_invoices,
+QUARTERLY_MONTHS
+)
 
 # Load environment variables
 
@@ -155,6 +166,7 @@ def _get_tenant_info(self) -> bool:
 def get_contact_billing_info(self, contact_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Extract billing frequency and schedule from contact information.
+    UPDATED: Now uses billing schedules from constants.py
     
     Args:
         contact_data (dict): Contact data from Xero
@@ -176,28 +188,8 @@ def get_contact_billing_info(self, contact_data: Dict[str, Any]) -> Dict[str, An
         
         base_code, sequence_digit, contact_code = parsed
         
-        # Define billing schedules based on contact codes
-        # TODO: Move this to constants.py once you add the complete mapping
-        BILLING_SCHEDULES = {
-            # Quarterly Billing
-            "/1A": {"frequency": "quarterly", "start_month": 1, "start_day": 1},     # Jan 1, Apr 1, Jul 1, Oct 1
-            "/2A": {"frequency": "quarterly", "start_month": 1, "start_day": 5},     # Jan 5, Apr 5, Jul 5, Oct 5
-            "/1B": {"frequency": "quarterly", "start_month": 1, "start_day": 12},    # Jan 12, Apr 12, Jul 12, Oct 12
-            "/3A": {"frequency": "quarterly", "start_month": 1, "start_day": 14},    # Jan 14, Apr 14, Jul 14, Oct 14
-            
-            # Monthly Billing
-            "/3B": {"frequency": "monthly", "start_month": 1, "start_day": 1},       # 1st of each month
-            "/3C": {"frequency": "monthly", "start_month": 1, "start_day": 16},      # 16th of each month
-            "/3D": {"frequency": "monthly", "start_month": 1, "start_day": 23},      # 23rd of each month
-            
-            # Other codes (assume quarterly for now)
-            "/1C": {"frequency": "quarterly", "start_month": 1, "start_day": 1},
-            "/A": {"frequency": "quarterly", "start_month": 1, "start_day": 1},
-            "/B": {"frequency": "quarterly", "start_month": 1, "start_day": 1},
-            "/D": {"frequency": "quarterly", "start_month": 1, "start_day": 1},
-        }
-        
-        schedule = BILLING_SCHEDULES.get(contact_code)
+        # Get billing schedule from constants.py
+        schedule = get_billing_schedule(contact_code)
         
         if not schedule:
             return {
@@ -207,10 +199,19 @@ def get_contact_billing_info(self, contact_data: Dict[str, Any]) -> Dict[str, An
                 'schedule': None
             }
         
+        # Check if this contact code can have split invoices
+        if not can_split_invoices(contact_code):
+            return {
+                'error': f'Contact code {contact_code} does not have regular billing - cannot split invoices',
+                'contact_code': contact_code,
+                'frequency': schedule.get('frequency'),
+                'schedule': schedule
+            }
+        
         return {
             'error': None,
             'contact_code': contact_code,
-            'frequency': schedule['frequency'],
+            'frequency': schedule.get('frequency'),
             'schedule': schedule,
             'account_number': account_number
         }
@@ -226,6 +227,7 @@ def get_contact_billing_info(self, contact_data: Dict[str, Any]) -> Dict[str, An
 def calculate_invoice_period(self, invoice_date: date, billing_info: Dict[str, Any]) -> Tuple[date, date]:
     """
     Calculate the start and end dates of an invoice period.
+    UPDATED: Now uses billing schedules from constants.py
     
     Args:
         invoice_date (date): Date the invoice was issued
@@ -235,12 +237,12 @@ def calculate_invoice_period(self, invoice_date: date, billing_info: Dict[str, A
         tuple: (period_start_date, period_end_date)
     """
     try:
-        frequency = billing_info['frequency']
         schedule = billing_info['schedule']
+        frequency = schedule['frequency']
+        start_day = schedule['start_day']
         
         if frequency == 'monthly':
             # Monthly billing - period is one month
-            start_day = schedule['start_day']
             
             # Find the start of the period this invoice covers
             if invoice_date.day >= start_day:
@@ -263,14 +265,10 @@ def calculate_invoice_period(self, invoice_date: date, billing_info: Dict[str, A
             
         elif frequency == 'quarterly':
             # Quarterly billing - period is three months
-            start_day = schedule['start_day']
-            
-            # Define quarterly start months
-            quarterly_months = [1, 4, 7, 10]  # Jan, Apr, Jul, Oct
             
             # Find which quarter this invoice covers
             invoice_quarter_month = None
-            for quarter_month in quarterly_months:
+            for quarter_month in QUARTERLY_MONTHS:
                 quarter_start = date(invoice_date.year, quarter_month, start_day)
                 if quarter_month <= 10:
                     next_quarter_start = date(invoice_date.year, quarter_month + 3, start_day)
@@ -283,7 +281,7 @@ def calculate_invoice_period(self, invoice_date: date, billing_info: Dict[str, A
             
             # If not found in current year, check previous year
             if invoice_quarter_month is None:
-                for quarter_month in quarterly_months:
+                for quarter_month in QUARTERLY_MONTHS:
                     quarter_start = date(invoice_date.year - 1, quarter_month, start_day)
                     if quarter_month <= 10:
                         next_quarter_start = date(invoice_date.year - 1, quarter_month + 3, start_day)
@@ -306,13 +304,21 @@ def calculate_invoice_period(self, invoice_date: date, billing_info: Dict[str, A
                 period_end = next_quarter_start - timedelta(days=1)
         
         else:
-            raise ValueError(f"Unknown frequency: {frequency}")
+            raise ValueError(f"Cannot calculate period for frequency: {frequency}")
         
         return period_start, period_end
         
     except Exception as e:
         print(f"Error calculating invoice period: {str(e)}")
-        # Fallback: assume invoice date is start, 90 days period
+        # Fallback: Get period days from constants and use that
+        contact_code = billing_info.get('contact_code')
+        if contact_code:
+            period_days = get_billing_period_days(contact_code)
+            if period_days:
+                # Use period_days as fallback (90 for quarterly, 30 for monthly)
+                return invoice_date, invoice_date + timedelta(days=period_days - 1)
+        
+        # Final fallback: assume 90 days
         return invoice_date, invoice_date + timedelta(days=89)
 
 def get_latest_unpaid_invoice(self, contact_id: str) -> Optional[Dict[str, Any]]:
@@ -828,10 +834,29 @@ except Exception as e:
 # Example usage and testing
 
 if **name** == “**main**”:
-print(“Xero Invoice Splitter - Test Mode”)
+print(“Xero Invoice Splitter - Test Mode (UPDATED)”)
 print(”-” * 40)
 
 ```
+# Test the billing schedule integration
+print("Testing billing schedule integration...")
+
+# Test with different contact codes
+test_codes = ["/3B", "/1A", "/P", "/CR"]
+
+for code in test_codes:
+    from constants import get_billing_schedule, can_split_invoices
+    
+    schedule = get_billing_schedule(code)
+    can_split = can_split_invoices(code)
+    
+    print(f"\nContact Code: {code}")
+    print(f"  Can Split: {can_split}")
+    if schedule:
+        print(f"  Frequency: {schedule.get('frequency')}")
+        print(f"  Period Days: {schedule.get('period_days')}")
+        print(f"  Start Day: {schedule.get('start_day')}")
+
 # Example: Get latest invoice for splitting
 # invoice = get_latest_invoice_for_splitting("contact-id-here")
 # if invoice:
