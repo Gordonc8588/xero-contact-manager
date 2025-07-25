@@ -346,187 +346,187 @@ class XeroContactManager:
             return False
     
     def check_contact_exists(self, account_number: str) -> Optional[Dict[str, Any]]:
-    """
-    Check if a contact with the given account number already exists.
-    
-    Args:
-        account_number (str): Full account number to check (e.g., "TST001002/1A")
+        """
+        Check if a contact with the given account number already exists.
         
-    Returns:
-        dict: Contact data if found, None if doesn't exist
-    """
-    try:
-        headers = {
-            'Authorization': f'Bearer {self.access_token}',
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        }
-        
-        if self.tenant_id and self.tenant_id != "custom_connection":
-            headers['Xero-Tenant-Id'] = self.tenant_id
-        
-        print(f"Checking if contact exists: {account_number}")
-        
-        params = {
-            'where': f'AccountNumber=="{account_number}"'
-        }
-        
-        response = requests.get(
-            f'{self.base_url}/Contacts',
-            headers=headers,
-            params=params
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            contacts = data.get('Contacts', [])
+        Args:
+            account_number (str): Full account number to check (e.g., "TST001002/1A")
             
-            if contacts:
-                print(f"✅ Contact exists: {contacts[0].get('Name', 'Unknown')}")
-                return contacts[0]
+        Returns:
+            dict: Contact data if found, None if doesn't exist
+        """
+        try:
+            headers = {
+                'Authorization': f'Bearer {self.access_token}',
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+            
+            if self.tenant_id and self.tenant_id != "custom_connection":
+                headers['Xero-Tenant-Id'] = self.tenant_id
+            
+            print(f"Checking if contact exists: {account_number}")
+            
+            params = {
+                'where': f'AccountNumber=="{account_number}"'
+            }
+            
+            response = requests.get(
+                f'{self.base_url}/Contacts',
+                headers=headers,
+                params=params
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                contacts = data.get('Contacts', [])
+                
+                if contacts:
+                    print(f"✅ Contact exists: {contacts[0].get('Name', 'Unknown')}")
+                    return contacts[0]
+                else:
+                    print(f"✅ Contact does not exist: {account_number}")
+                    return None
             else:
-                print(f"✅ Contact does not exist: {account_number}")
+                print(f"❌ Error checking contact existence: {response.status_code} - {response.text}")
                 return None
-        else:
-            print(f"❌ Error checking contact existence: {response.status_code} - {response.text}")
+                
+        except Exception as e:
+            print(f"❌ Error checking contact existence: {str(e)}")
             return None
-            
-    except Exception as e:
-        print(f"❌ Error checking contact existence: {str(e)}")
-        return None
 
     def find_next_available_contact(self, base_account: str, contact_code: str, max_attempts: int = 50) -> Optional[str]:
-    """
-    Find the next available sequential contact number for a given base and contact code.
-    
-    Args:
-        base_account (str): Base account without contact code (e.g., "TST001001")
-        contact_code (str): Contact code to append (e.g., "/1A")
-        max_attempts (int): Maximum number of sequences to check
+        """
+        Find the next available sequential contact number for a given base and contact code.
         
-    Returns:
-        str: Next available account number if found, None if all checked slots are taken
-    """
-    try:
-        # Parse the base account to get the property base and current sequence
-        parsed = parse_account_number(base_account)
-        if not parsed:
-            print(f"❌ Cannot parse base account: {base_account}")
-            return None
-        
-        property_base, current_sequence, _ = parsed
-        
-        # Start checking from the next sequence number
-        next_sequence = int(current_sequence) + 1
-        
-        print(f"🔍 Looking for next available contact starting from sequence {next_sequence:03d}")
-        
-        for attempt in range(max_attempts):
-            test_sequence = next_sequence + attempt
-            test_account = f"{property_base}{test_sequence:03d}{contact_code}"
+        Args:
+            base_account (str): Base account without contact code (e.g., "TST001001")
+            contact_code (str): Contact code to append (e.g., "/1A")
+            max_attempts (int): Maximum number of sequences to check
             
-            print(f"   Checking: {test_account}")
+        Returns:
+            str: Next available account number if found, None if all checked slots are taken
+        """
+        try:
+            # Parse the base account to get the property base and current sequence
+            parsed = parse_account_number(base_account)
+            if not parsed:
+                print(f"❌ Cannot parse base account: {base_account}")
+                return None
             
-            # Check if this account number exists
-            existing_contact = self.check_contact_exists(test_account)
+            property_base, current_sequence, _ = parsed
             
-            if existing_contact is None:  # Contact doesn't exist - we found our slot!
-                print(f"✅ Found available slot: {test_account}")
-                return test_account
-            else:
-                print(f"   ❌ Taken: {test_account}")
+            # Start checking from the next sequence number
+            next_sequence = int(current_sequence) + 1
+            
+            print(f"🔍 Looking for next available contact starting from sequence {next_sequence:03d}")
+            
+            for attempt in range(max_attempts):
+                test_sequence = next_sequence + attempt
+                test_account = f"{property_base}{test_sequence:03d}{contact_code}"
                 
-        print(f"⚠️ No available contact found after checking {max_attempts} sequences")
-        return None
-        
-    except Exception as e:
-        print(f"❌ Error finding next available contact: {str(e)}")
-        return None
+                print(f"   Checking: {test_account}")
+                
+                # Check if this account number exists
+                existing_contact = self.check_contact_exists(test_account)
+                
+                if existing_contact is None:  # Contact doesn't exist - we found our slot!
+                    print(f"✅ Found available slot: {test_account}")
+                    return test_account
+                else:
+                    print(f"   ❌ Taken: {test_account}")
+                    
+            print(f"⚠️ No available contact found after checking {max_attempts} sequences")
+            return None
+            
+        except Exception as e:
+            print(f"❌ Error finding next available contact: {str(e)}")
+            return None
 
     def validate_contact_before_creation(self, existing_contact: Dict[str, Any], contact_code: str) -> Dict[str, Any]:
-    """
-    Validate if the contact can be created and provide options if duplicate exists.
-    
-    Args:
-        existing_contact (dict): Original contact data from Xero
-        contact_code (str): Selected contact code (e.g., "/1A")
+        """
+        Validate if the contact can be created and provide options if duplicate exists.
         
-    Returns:
-        dict: Validation result with status and options
-    """
-    try:
-        # Get original account number and calculate next sequence
-        original_account = existing_contact.get('AccountNumber', '')
-        next_account_base = increment_account_sequence(original_account)
-        
-        if not next_account_base:
+        Args:
+            existing_contact (dict): Original contact data from Xero
+            contact_code (str): Selected contact code (e.g., "/1A")
+            
+        Returns:
+            dict: Validation result with status and options
+        """
+        try:
+            # Get original account number and calculate next sequence
+            original_account = existing_contact.get('AccountNumber', '')
+            next_account_base = increment_account_sequence(original_account)
+            
+            if not next_account_base:
+                return {
+                    'status': 'error',
+                    'message': f'Cannot increment account sequence from: {original_account}',
+                    'options': []
+                }
+            
+            # Calculate the full account number with contact code
+            proposed_account = f"{next_account_base.split('/')[0]}{contact_code}"
+            
+            print(f"🔍 Validating proposed account: {proposed_account}")
+            
+            # Check if the proposed account already exists
+            existing_duplicate = self.check_contact_exists(proposed_account)
+            
+            if existing_duplicate is None:
+                # No duplicate - all clear to create
+                return {
+                    'status': 'available',
+                    'proposed_account': proposed_account,
+                    'message': f'Account {proposed_account} is available',
+                    'options': []
+                }
+            else:
+                # Duplicate found - provide options
+                duplicate_name = existing_duplicate.get('Name', 'Unknown Contact')
+                
+                # Find next available slot
+                base_account_only = next_account_base.split('/')[0]  # Remove any existing contact code
+                next_available = self.find_next_available_contact(base_account_only, contact_code)
+                
+                options = [
+                    {
+                        'type': 'use_existing',
+                        'account_number': proposed_account,
+                        'contact_name': duplicate_name,
+                        'contact_id': existing_duplicate.get('ContactID'),
+                        'description': f'Use existing contact: {duplicate_name}'
+                    }
+                ]
+                
+                if next_available:
+                    options.append({
+                        'type': 'create_next',
+                        'account_number': next_available,
+                        'description': f'Create new contact: {next_available}'
+                    })
+                else:
+                    options.append({
+                        'type': 'no_available',
+                        'description': 'No available sequential numbers found'
+                    })
+                
+                return {
+                    'status': 'duplicate_found',
+                    'proposed_account': proposed_account,
+                    'duplicate_contact': existing_duplicate,
+                    'message': f'Contact {proposed_account} already exists: {duplicate_name}',
+                    'options': options
+                }
+                
+        except Exception as e:
+            print(f"❌ Error in contact validation: {str(e)}")
             return {
                 'status': 'error',
-                'message': f'Cannot increment account sequence from: {original_account}',
+                'message': f'Validation error: {str(e)}',
                 'options': []
             }
-        
-        # Calculate the full account number with contact code
-        proposed_account = f"{next_account_base.split('/')[0]}{contact_code}"
-        
-        print(f"🔍 Validating proposed account: {proposed_account}")
-        
-        # Check if the proposed account already exists
-        existing_duplicate = self.check_contact_exists(proposed_account)
-        
-        if existing_duplicate is None:
-            # No duplicate - all clear to create
-            return {
-                'status': 'available',
-                'proposed_account': proposed_account,
-                'message': f'Account {proposed_account} is available',
-                'options': []
-            }
-        else:
-            # Duplicate found - provide options
-            duplicate_name = existing_duplicate.get('Name', 'Unknown Contact')
-            
-            # Find next available slot
-            base_account_only = next_account_base.split('/')[0]  # Remove any existing contact code
-            next_available = self.find_next_available_contact(base_account_only, contact_code)
-            
-            options = [
-                {
-                    'type': 'use_existing',
-                    'account_number': proposed_account,
-                    'contact_name': duplicate_name,
-                    'contact_id': existing_duplicate.get('ContactID'),
-                    'description': f'Use existing contact: {duplicate_name}'
-                }
-            ]
-            
-            if next_available:
-                options.append({
-                    'type': 'create_next',
-                    'account_number': next_available,
-                    'description': f'Create new contact: {next_available}'
-                })
-            else:
-                options.append({
-                    'type': 'no_available',
-                    'description': 'No available sequential numbers found'
-                })
-            
-            return {
-                'status': 'duplicate_found',
-                'proposed_account': proposed_account,
-                'duplicate_contact': existing_duplicate,
-                'message': f'Contact {proposed_account} already exists: {duplicate_name}',
-                'options': options
-            }
-            
-    except Exception as e:
-        print(f"❌ Error in contact validation: {str(e)}")
-        return {
-            'status': 'error',
-            'message': f'Validation error: {str(e)}',
-            'options': []
-        }
 
     def create_new_contact(self, existing_contact: Dict[str, Any], new_contact_data: Dict[str, str]) -> Optional[Dict[str, Any]]:
         """
