@@ -475,8 +475,12 @@ def execute_split(invoice: Dict[str, Any], new_contact_id: str, split_calculatio
 
 # Main Streamlit App
 def main():
+
+    # Add logo at the top
+    st.image("src/assets/logo-trasparent-06.png", width=300)
+
     # Minimalist header
-    st.title("🏢 Xero Property Contact Manager")
+    st.title("🏢 Xero New Occupier Manager")
     
     # Status indicator
     col1, col2, col3 = st.columns([2, 1, 1])
