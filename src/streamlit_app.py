@@ -1,12 +1,3 @@
-“””
-Xero Contact Manager - Streamlit Interface (Updated with Invoice Splitting)
-
-This module provides a Streamlit web interface for creating new property contacts
-in Xero by duplicating existing contacts with modifications.
-
-UPDATED: Now includes invoice splitting functionality for occupier transitions.
-“””
-
 import streamlit as st
 import time
 from typing import Optional, Dict, Any, List
