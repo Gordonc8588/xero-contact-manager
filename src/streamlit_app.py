@@ -87,6 +87,10 @@ if 'previous_contact_balance' not in st.session_state:
     st.session_state.previous_contact_balance = None
 if 'previous_contact_processed' not in st.session_state:
     st.session_state.previous_contact_processed = False
+if 'contact_validation_result' not in st.session_state:
+    st.session_state.contact_validation_result = None
+if 'selected_contact_option' not in st.session_state:
+    st.session_state.selected_contact_option = None
 
 def initialize_contact_manager():
     """Initialize and authenticate contact manager."""
@@ -126,6 +130,28 @@ def search_contact(account_number: str):
     if not st.session_state.authenticated:
         if not authenticate_xero():
             return None
+
+def handle_previous_contact_workflow(old_contact_id: str):
+    """Handle the complete previous contact workflow."""
+    try:
+        with st.spinner("Processing previous contact..."):
+            # Use existing authentication from contact_manager
+            access_token = st.session_state.contact_manager.access_token
+            tenant_id = st.session_state.contact_manager.tenant_id
+            
+            result = handle_previous_contact_after_reassignment(
+                old_contact_id,
+                access_token,
+                tenant_id
+            )
+            
+            return result
+    except Exception as e:
+        st.error(f"Error handling previous contact: {str(e)}")
+        return {
+            'success': False,
+            'error': f"Error during previous contact handling: {str(e)}"
+        }
     
     try:
         with st.spinner(f"Searching for contact: {account_number}"):
@@ -279,7 +305,71 @@ def get_previous_contact_balance_info(old_contact_id: str):
         st.error(f"Error getting previous contact balance: {str(e)}")
         return None
 
-def handle_previous_contact_workflow(old_contact_id: str):
+def validate_contact_creation(existing_contact, selected_code):
+    """Validate contact creation and check for duplicates."""
+    if not st.session_state.authenticated:
+        if not authenticate_xero():
+            return None
+    
+    try:
+        validation_result = st.session_state.contact_manager.validate_contact_before_creation(
+            existing_contact, selected_code
+        )
+        return validation_result
+    except Exception as e:
+        st.error(f"Error validating contact: {str(e)}")
+        return None
+
+def handle_contact_creation_with_option(contact_data: Dict[str, str], selected_option: Dict[str, Any]):
+    """Handle contact creation based on selected duplicate resolution option."""
+    if not st.session_state.existing_contact:
+        st.error("No existing contact found. Please search first.")
+        return None
+    
+    try:
+        if selected_option['type'] == 'use_existing':
+            # User chose to use existing contact - just return the existing contact data
+            existing_contact_id = selected_option['contact_id']
+            
+            # Fetch full contact details
+            with st.spinner("Loading existing contact details..."):
+                # We can use the contact data we already have or fetch fresh
+                existing_contact_data = {
+                    'ContactID': existing_contact_id,
+                    'Name': selected_option['contact_name'],
+                    'AccountNumber': selected_option['account_number']
+                }
+                
+                st.session_state.new_contact = existing_contact_data
+                return existing_contact_data
+                
+        elif selected_option['type'] == 'create_next':
+            # User chose to create next sequential contact
+            # Modify the contact data to use the next available account number
+            modified_contact_data = contact_data.copy()
+            
+            # Extract the contact code from the next available account number
+            next_account = selected_option['account_number']
+            if '/' in next_account:
+                contact_code = '/' + next_account.split('/')[-1]
+                modified_contact_data['contact_code'] = contact_code
+            
+            with st.spinner("Creating next sequential contact..."):
+                new_contact = st.session_state.contact_manager.create_new_contact(
+                    st.session_state.existing_contact, 
+                    modified_contact_data
+                )
+                
+                if new_contact:
+                    st.session_state.new_contact = new_contact
+                return new_contact
+        else:
+            st.error("Invalid option selected")
+            return None
+            
+    except Exception as e:
+        st.error(f"Error handling contact creation: {str(e)}")
+        return None
     """Handle the complete previous contact workflow."""
     try:
         with st.spinner("Processing previous contact..."):
@@ -318,7 +408,8 @@ def main():
     with col3:
         if st.button("🔄 Reset", type="secondary"):
             keys_to_clear = ['existing_contact', 'search_performed', 'new_contact', 'found_invoices', 
-                           'selected_invoices', 'found_repeating_templates', 'previous_contact_balance', 'previous_contact_processed']
+                           'selected_invoices', 'found_repeating_templates', 'previous_contact_balance', 
+                           'previous_contact_processed', 'contact_validation_result', 'selected_contact_option']
             for key in keys_to_clear:
                 if key in st.session_state:
                     del st.session_state[key]
@@ -374,21 +465,114 @@ def main():
         with col4:
             email = st.text_input("Email", placeholder="Enter email")
         
-        # Validation and create button
-        can_create = bool(selected_code and first_name.strip())
-        
-        if can_create:
-            if st.button("🆕 Create New Contact", type="primary"):
-                new_contact_data = {
-                    'contact_code': selected_code,
-                    'first_name': first_name.strip(),
-                    'last_name': last_name.strip(),
-                    'email': email.strip()
-                }
+        # Real-time validation when contact code is selected
+        if selected_code:
+            if st.session_state.contact_validation_result is None or \
+               st.session_state.contact_validation_result.get('contact_code') != selected_code:
                 
-                new_contact = create_new_contact(new_contact_data)
-                if new_contact:
-                    st.success(f"✅ Created: {new_contact.get('Name', 'Unknown')}")
+                # Validate the contact creation
+                validation_result = validate_contact_creation(st.session_state.existing_contact, selected_code)
+                
+                if validation_result:
+                    validation_result['contact_code'] = selected_code  # Store which code was validated
+                    st.session_state.contact_validation_result = validation_result
+                    # Reset option selection when validation changes
+                    st.session_state.selected_contact_option = None
+                    st.rerun()
+        
+        # Show validation results
+        if st.session_state.contact_validation_result:
+            validation = st.session_state.contact_validation_result
+            
+            if validation['status'] == 'available':
+                st.success(f"✅ {validation['message']}")
+                
+            elif validation['status'] == 'duplicate_found':
+                st.warning(f"⚠️ {validation['message']}")
+                
+                # Show options for duplicate resolution
+                st.markdown("**Choose how to proceed:**")
+                
+                for i, option in enumerate(validation['options']):
+                    option_key = f"option_{i}"
+                    
+                    if option['type'] == 'use_existing':
+                        if st.button(f"📋 Use existing contact: {option['account_number']}", 
+                                   key=option_key, use_container_width=True):
+                            st.session_state.selected_contact_option = option
+                            st.rerun()
+                            
+                    elif option['type'] == 'create_next':
+                        if st.button(f"🆕 Create new contact: {option['account_number']}", 
+                                   key=option_key, use_container_width=True):
+                            st.session_state.selected_contact_option = option
+                            st.rerun()
+                            
+                    elif option['type'] == 'no_available':
+                        st.error("❌ No sequential numbers available - please choose a different contact code")
+                
+            elif validation['status'] == 'error':
+                st.error(f"❌ {validation['message']}")
+        
+        # Show selected option and create button
+        if st.session_state.selected_contact_option:
+            selected_option = st.session_state.selected_contact_option
+            
+            if selected_option['type'] == 'use_existing':
+                st.info(f"📋 **Selected:** Use existing contact {selected_option['account_number']}")
+            elif selected_option['type'] == 'create_next':
+                st.info(f"🆕 **Selected:** Create new contact {selected_option['account_number']}")
+            
+            # Validation and create button
+            can_create = bool(selected_code and first_name.strip())
+            
+            if can_create:
+                if st.button("✅ Proceed with Selected Option", type="primary"):
+                    new_contact_data = {
+                        'contact_code': selected_code,
+                        'first_name': first_name.strip(),
+                        'last_name': last_name.strip(),
+                        'email': email.strip()
+                    }
+                    
+                    new_contact = handle_contact_creation_with_option(new_contact_data, selected_option)
+                    if new_contact:
+                        if selected_option['type'] == 'use_existing':
+                            st.success(f"✅ Using existing contact: {new_contact.get('Name', 'Unknown')}")
+                        else:
+                            st.success(f"✅ Created new contact: {new_contact.get('Name', 'Unknown')}")
+                        
+                        # Clear validation state for next time
+                        st.session_state.contact_validation_result = None
+                        st.session_state.selected_contact_option = None
+            else:
+                missing = []
+                if not selected_code:
+                    missing.append("Contact Code")
+                if not first_name.strip():
+                    missing.append("First Name")
+                st.warning(f"⚠️ Please provide: {', '.join(missing)}")
+        
+        elif selected_code and st.session_state.contact_validation_result and \
+             st.session_state.contact_validation_result['status'] == 'available':
+            # Normal creation path for available contacts
+            can_create = bool(selected_code and first_name.strip())
+            
+            if can_create:
+                if st.button("🆕 Create New Contact", type="primary"):
+                    new_contact_data = {
+                        'contact_code': selected_code,
+                        'first_name': first_name.strip(),
+                        'last_name': last_name.strip(),
+                        'email': email.strip()
+                    }
+                    
+                    new_contact = create_new_contact(new_contact_data)
+                    if new_contact:
+                        st.success(f"✅ Created: {new_contact.get('Name', 'Unknown')}")
+                        
+                        # Clear validation state for next time
+                        st.session_state.contact_validation_result = None
     
     # ============================================================================
     # SECTION 3: Invoice Reassignment (only show if new contact created)
@@ -632,7 +816,8 @@ def main():
             button_text = "🆕 Start New Workflow" if st.session_state.previous_contact_processed else "🔄 Reset Current Workflow"
             if st.button(button_text, type="primary", use_container_width=True):
                 keys_to_clear = ['existing_contact', 'search_performed', 'new_contact', 'found_invoices', 
-                               'selected_invoices', 'found_repeating_templates', 'previous_contact_balance', 'previous_contact_processed']
+                               'selected_invoices', 'found_repeating_templates', 'previous_contact_balance', 
+                               'previous_contact_processed', 'contact_validation_result', 'selected_contact_option']
                 for key in keys_to_clear:
                     if key in st.session_state:
                         del st.session_state[key]
