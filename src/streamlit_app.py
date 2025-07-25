@@ -1,4 +1,4 @@
-# “””
+“””
 Xero Contact Manager - Streamlit Interface (Updated with Invoice Splitting)
 
 This module provides a Streamlit web interface for creating new property contacts
