@@ -130,28 +130,6 @@ def search_contact(account_number: str):
     if not st.session_state.authenticated:
         if not authenticate_xero():
             return None
-
-def handle_previous_contact_workflow(old_contact_id: str):
-    """Handle the complete previous contact workflow."""
-    try:
-        with st.spinner("Processing previous contact..."):
-            # Use existing authentication from contact_manager
-            access_token = st.session_state.contact_manager.access_token
-            tenant_id = st.session_state.contact_manager.tenant_id
-            
-            result = handle_previous_contact_after_reassignment(
-                old_contact_id,
-                access_token,
-                tenant_id
-            )
-            
-            return result
-    except Exception as e:
-        st.error(f"Error handling previous contact: {str(e)}")
-        return {
-            'success': False,
-            'error': f"Error during previous contact handling: {str(e)}"
-        }
     
     try:
         with st.spinner(f"Searching for contact: {account_number}"):
@@ -370,6 +348,8 @@ def handle_contact_creation_with_option(contact_data: Dict[str, str], selected_o
     except Exception as e:
         st.error(f"Error handling contact creation: {str(e)}")
         return None
+
+def handle_previous_contact_workflow(old_contact_id: str):
     """Handle the complete previous contact workflow."""
     try:
         with st.spinner("Processing previous contact..."):
