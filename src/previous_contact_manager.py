@@ -282,7 +282,7 @@ class XeroPreviousContactManager:
                 headers=headers
             )
             
-            if response.status_code == 200:
+            if response.status_code in [200, 204]:
                 print(f"✅ Successfully removed contact from group")
                 return True
             else:
