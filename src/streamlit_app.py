@@ -689,24 +689,43 @@ def main():
                 if st.button("🔄 Handle", type="primary"):
                     old_contact_id = st.session_state.existing_contact.get('ContactID')
                     result = handle_previous_contact_workflow(old_contact_id)
+                    
+                    # Debug: Show exactly what came back
+                    st.write("🐛 **Debug - Full Result:**")
+                    st.json(result)
+                    
                     if result.get('success'):
                         # Show detailed confirmation
                         groups_removed = result.get('groups_removed', [])
                         added_to_previous = result.get('added_to_previous_group', False)
                         contact_updated = result.get('contact_updated', False)
                         
-                        if contact_updated and added_to_previous:
-                            st.success("✅ Previous contact handled: /P code set, moved to '+ Previous accounts still due'")
-                        elif contact_updated:
-                            st.warning("⚠️ Contact updated to /P but group assignment may have failed")
-                        else:
-                            st.error("❌ Failed to update previous contact")
+                        st.success("✅ Previous contact workflow completed successfully!")
+                        st.write(f"• Contact Updated: {contact_updated}")
+                        st.write(f"• Added to Previous Group: {added_to_previous}")
+                        st.write(f"• Groups Removed: {len(groups_removed)} ({', '.join(groups_removed) if groups_removed else 'none'})")
                         
                         st.session_state.previous_contact_processed = True
                         st.rerun()  # Force refresh to show summary
                     else:
                         error_msg = result.get('error', 'Unknown error')
-                        st.error(f"❌ Failed: {error_msg}")
+                        st.error(f"❌ Workflow reported failure: {error_msg}")
+                        
+                        # Show what actually succeeded despite the failure
+                        st.write("🔍 **What Actually Happened:**")
+                        if result.get('contact_updated'):
+                            st.write("✅ Contact was updated to /P")
+                        if result.get('added_to_previous_group'):
+                            st.write("✅ Contact was added to previous accounts group")
+                        if result.get('groups_removed'):
+                            st.write(f"✅ Removed from {len(result.get('groups_removed', []))} groups")
+                        
+                        # If everything actually worked, mark as processed anyway
+                        if (result.get('contact_updated') and 
+                            result.get('added_to_previous_group')):
+                            st.warning("⚠️ Marking as completed since operations actually succeeded")
+                            st.session_state.previous_contact_processed = True
+                            st.rerun()
     
     # Show workflow summary when new contact is created
     if st.session_state.new_contact and st.session_state.existing_contact:
