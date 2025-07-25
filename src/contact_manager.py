@@ -395,7 +395,7 @@ class XeroContactManager:
         print(f"❌ Error checking contact existence: {str(e)}")
         return None
 
-def find_next_available_contact(self, base_account: str, contact_code: str, max_attempts: int = 50) -> Optional[str]:
+    def find_next_available_contact(self, base_account: str, contact_code: str, max_attempts: int = 50) -> Optional[str]:
     """
     Find the next available sequential contact number for a given base and contact code.
     
@@ -443,7 +443,7 @@ def find_next_available_contact(self, base_account: str, contact_code: str, max_
         print(f"❌ Error finding next available contact: {str(e)}")
         return None
 
-def validate_contact_before_creation(self, existing_contact: Dict[str, Any], contact_code: str) -> Dict[str, Any]:
+    def validate_contact_before_creation(self, existing_contact: Dict[str, Any], contact_code: str) -> Dict[str, Any]:
     """
     Validate if the contact can be created and provide options if duplicate exists.
     
