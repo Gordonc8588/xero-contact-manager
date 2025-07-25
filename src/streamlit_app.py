@@ -445,8 +445,12 @@ def main():
         with col4:
             email = st.text_input("Email", placeholder="Enter email")
         
-        # Real-time validation when contact code is selected
-        if selected_code:
+        # Show contact creation status
+        if st.session_state.new_contact:
+            st.success(f"✅ Contact created: {st.session_state.new_contact.get('Name', 'Unknown')} ({st.session_state.new_contact.get('AccountNumber', 'N/A')})")
+        
+        # Real-time validation when contact code is selected (but NOT if contact already created)
+        if selected_code and not st.session_state.new_contact:
             if st.session_state.contact_validation_result is None or \
                st.session_state.contact_validation_result.get('contact_code') != selected_code:
                 
@@ -460,8 +464,8 @@ def main():
                     st.session_state.selected_contact_option = None
                     st.rerun()
         
-        # Show validation results
-        if st.session_state.contact_validation_result:
+        # Show validation results (only if no contact created yet)
+        if st.session_state.contact_validation_result and not st.session_state.new_contact:
             validation = st.session_state.contact_validation_result
             
             if validation['status'] == 'available':
@@ -494,8 +498,8 @@ def main():
             elif validation['status'] == 'error':
                 st.error(f"❌ {validation['message']}")
         
-        # Show selected option and create button
-        if st.session_state.selected_contact_option:
+        # Show selected option and create button (only if no contact created yet)
+        if st.session_state.selected_contact_option and not st.session_state.new_contact:
             selected_option = st.session_state.selected_contact_option
             
             if selected_option['type'] == 'use_existing':
@@ -534,7 +538,8 @@ def main():
                 st.warning(f"⚠️ Please provide: {', '.join(missing)}")
         
         elif selected_code and st.session_state.contact_validation_result and \
-             st.session_state.contact_validation_result['status'] == 'available':
+             st.session_state.contact_validation_result['status'] == 'available' and \
+             not st.session_state.new_contact:
             # Normal creation path for available contacts
             can_create = bool(selected_code and first_name.strip())
             
