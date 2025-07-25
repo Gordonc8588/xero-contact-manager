@@ -480,7 +480,7 @@ def main():
     st.image("src/assets/logo-trasparent-06.png", width=300)
 
     # Minimalist header
-    st.title("🏢 Xero New Occupier Manager")
+    st.title("Xero New Occupier Manager")
     
     # Status indicator
     col1, col2, col3 = st.columns([2, 1, 1])
@@ -800,7 +800,7 @@ def main():
                 status_text = f"Balance: ${outstanding:.2f} - {'Keep Active' if has_balance else 'Set Inactive'}"
                 st.write(status_text)
             with col2:
-                if st.button("🔄 Handle", type="primary"):
+                if st.button("🔄 Assign /P group", type="primary"):
                     old_contact_id = st.session_state.existing_contact.get('ContactID')
                     result = handle_previous_contact_workflow(old_contact_id)
                     
