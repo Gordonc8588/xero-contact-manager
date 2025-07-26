@@ -59,38 +59,145 @@ def check_password():
 
 
 # Configure Streamlit page
-st.set_page_config()
-    st.markdown("""
-<style>
-/* Primary button styling - Change these colors to match your brand */
-.stButton > button {
-    background: linear-gradient(45deg, #2E5BBA, #1B4F9C) !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 8px !important;
-    font-weight: 600 !important;
-    transition: all 0.3s ease !important;
-}
-
-.stButton > button:hover {
-    background: linear-gradient(45deg, #1B4F9C, #2E5BBA) !important;
-    transform: translateY(-2px) !important;
-    box-shadow: 0 4px 12px rgba(46, 91, 186, 0.3) !important;
-}
-
-/* Secondary button styling */
-.stButton > button[kind="secondary"] {
-    background: #F8F9FA !important;
-    color: #2E5BBA !important;
-    border: 2px solid #2E5BBA !important;
-}
-</style>
-""", unsafe_allow_html=True)
+st.set_page_config(
     page_title="Xero Contact Manager",
     page_icon="🏢",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+# Custom CSS for Capital Stair Services branding
+st.markdown("""
+<style>
+/* Capital Stair Services Brand Colors */
+:root {
+    --primary-blue: #1e3a8a;
+    --secondary-blue: #3b82f6;
+    --accent-blue: #60a5fa;
+    --dark-blue: #1e40af;
+    --light-gray: #f8fafc;
+    --medium-gray: #64748b;
+}
+
+/* Primary button styling */
+.stButton > button {
+    background: linear-gradient(45deg, var(--primary-blue), var(--secondary-blue)) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 2px 8px rgba(30, 58, 138, 0.2) !important;
+}
+
+.stButton > button:hover {
+    background: linear-gradient(45deg, var(--dark-blue), var(--primary-blue)) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3) !important;
+}
+
+/* Secondary button styling */
+.stButton > button[kind="secondary"] {
+    background: var(--light-gray) !important;
+    color: var(--primary-blue) !important;
+    border: 2px solid var(--primary-blue) !important;
+}
+
+.stButton > button[kind="secondary"]:hover {
+    background: var(--primary-blue) !important;
+    color: white !important;
+    border: 2px solid var(--primary-blue) !important;
+}
+
+/* Input field styling */
+.stTextInput > div > div > input {
+    border: 2px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    transition: border-color 0.3s ease !important;
+}
+
+.stTextInput > div > div > input:focus {
+    border-color: var(--secondary-blue) !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Select box styling */
+.stSelectbox > div > div > div {
+    border: 2px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+}
+
+/* Date input styling */
+.stDateInput > div > div > input {
+    border: 2px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+}
+
+/* Success message styling */
+.stSuccess {
+    background-color: #dcfce7 !important;
+    border: 1px solid #bbf7d0 !important;
+    border-radius: 8px !important;
+    color: #15803d !important;
+}
+
+/* Warning message styling */
+.stWarning {
+    background-color: #fef3c7 !important;
+    border: 1px solid #fde68a !important;
+    border-radius: 8px !important;
+    color: #d97706 !important;
+}
+
+/* Error message styling */
+.stError {
+    background-color: #fee2e2 !important;
+    border: 1px solid #fecaca !important;
+    border-radius: 8px !important;
+    color: #dc2626 !important;
+}
+
+/* Info message styling */
+.stInfo {
+    background-color: #dbeafe !important;
+    border: 1px solid #bfdbfe !important;
+    border-radius: 8px !important;
+    color: var(--primary-blue) !important;
+}
+
+/* Main title styling */
+h1 {
+    color: var(--primary-blue) !important;
+    font-weight: 700 !important;
+}
+
+/* Section headers */
+h2, h3 {
+    color: var(--dark-blue) !important;
+}
+
+/* Checkbox styling */
+.stCheckbox > label > div {
+    background-color: white !important;
+    border: 2px solid #e2e8f0 !important;
+}
+
+.stCheckbox > label > div[data-checked="true"] {
+    background-color: var(--secondary-blue) !important;
+    border-color: var(--secondary-blue) !important;
+}
+
+/* Logo container */
+.logo-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border-radius: 12px;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # Initialize session state variables (UPDATED: Added invoice splitting variables)
 if 'contact_manager' not in st.session_state:
@@ -501,11 +608,14 @@ def execute_split(invoice: Dict[str, Any], new_contact_id: str, split_calculatio
 
 # Main Streamlit App
 def main():
+    # Logo container with styling
+    st.markdown('<div class="logo-container">', unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.image("src/assets/logo-trasparent-06.png", width=350)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    # Add logo at the top
-    st.image("src/assets/logo-trasparent-06.png", width=300)
-
-    # Minimalist header
+    # Main header
     st.title("Xero New Occupier Manager")
     
     # Status indicator
