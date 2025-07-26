@@ -60,6 +60,32 @@ def check_password():
 
 # Configure Streamlit page
 st.set_page_config(
+    st.markdown("""
+<style>
+/* Primary button styling - Change these colors to match your brand */
+.stButton > button {
+    background: linear-gradient(45deg, #2E5BBA, #1B4F9C) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    transition: all 0.3s ease !important;
+}
+
+.stButton > button:hover {
+    background: linear-gradient(45deg, #1B4F9C, #2E5BBA) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px rgba(46, 91, 186, 0.3) !important;
+}
+
+/* Secondary button styling */
+.stButton > button[kind="secondary"] {
+    background: #F8F9FA !important;
+    color: #2E5BBA !important;
+    border: 2px solid #2E5BBA !important;
+}
+</style>
+""", unsafe_allow_html=True)
     page_title="Xero Contact Manager",
     page_icon="🏢",
     layout="wide",
