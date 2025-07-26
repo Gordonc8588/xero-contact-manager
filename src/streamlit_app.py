@@ -59,7 +59,7 @@ def check_password():
 
 
 # Configure Streamlit page
-st.set_page_config(
+st.set_page_config()
     st.markdown("""
 <style>
 /* Primary button styling - Change these colors to match your brand */
